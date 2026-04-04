@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { CalendarRange, Crown, GanttChartSquare, Rocket } from 'lucide-react'
@@ -29,27 +29,82 @@ const modules = [
 
 export default function LandingPage() {
   const [activeModuleId, setActiveModuleId] = useState<(typeof modules)[number]['id']>('planning')
+  const vantaRef = useRef<HTMLDivElement>(null)
+  const vantaEffect = useRef<any>(null)
 
   const activeModule = useMemo(
     () => modules.find((module) => module.id === activeModuleId) || modules[0],
     [activeModuleId]
   )
 
+  useEffect(() => {
+    if (!vantaEffect.current && vantaRef.current) {
+      // Wait for VANTA to be available
+      const initVanta = () => {
+        if (typeof window !== 'undefined' && (window as any).VANTA && (window as any).THREE) {
+          console.log('Initializing Vanta.js Halo effect')
+          vantaEffect.current = (window as any).VANTA.HALO({
+            el: vantaRef.current,
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            backgroundColor: 0x06040d,
+            amplitudeFactor: 1.5,
+            xOffset: 0.2,
+            yOffset: -0.1,
+            size: 1.5,
+            baseColor: 0x7c3aed,
+            highlightColor: 0xa855f7
+          })
+        } else {
+          console.log('VANTA or THREE not available yet')
+        }
+      }
+
+      // Check if VANTA is already loaded
+      if ((window as any).VANTA && (window as any).THREE) {
+        initVanta()
+      } else {
+        // Wait for scripts to load with more frequent checks
+        const checkVanta = setInterval(() => {
+          if ((window as any).VANTA && (window as any).THREE) {
+            initVanta()
+            clearInterval(checkVanta)
+          }
+        }, 50)
+
+        // Cleanup interval after 15 seconds
+        setTimeout(() => {
+          clearInterval(checkVanta)
+          console.log('Vanta.js loading timeout')
+        }, 15000)
+      }
+    }
+
+    return () => {
+      if (vantaEffect.current) {
+        console.log('Destroying Vanta.js effect')
+        vantaEffect.current.destroy()
+        vantaEffect.current = null
+      }
+    }
+  }, [])
+
   return (
     <main
-      className="min-h-screen overflow-hidden bg-[#06040d] text-slate-100 font-sans"
-      style={{
-        backgroundImage:
-          'radial-gradient(circle at 20% 10%, rgba(124,58,237,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.2), transparent 30%), linear-gradient(120deg, #06040d 0%, #0c0818 45%, #1a1528 100%)',
-      }}
+      ref={vantaRef}
+      className="min-h-screen overflow-hidden bg-[#06040d] text-slate-100 font-sans relative"
     >
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-10 sm:px-10">
+      {/* Content overlay with backdrop blur for better readability */}
+      <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-10 sm:px-10">
         <header className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-purple-300">ELIXA Command Deck</p>
-            <h1 className="text-5xl font-black uppercase tracking-[0.08em] leading-none text-white sm:text-6xl">
-              Event Command
-            </h1>
+            <p className="text-purple-300">
+              <span className="text-6xl uppercase tracking-[0.4em] font-black font-mono">ELIXA</span>
+              <span className="text-sm lowercase tracking-[0.2em] ml-2">command deck</span>
+            </p>
           </div>
           <Link href={activeModule.route}>
             <Button className="bg-white text-slate-950 hover:bg-slate-100">Skip To Workspace</Button>
@@ -60,7 +115,7 @@ export default function LandingPage() {
           <div className="space-y-6">
             <motion.div
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-white/15 bg-[#1a1528]/60 p-6 backdrop-blur-md"
+              className="rounded-2xl border border-white/15 bg-[#1a1528]/80 backdrop-blur-sm p-6 transition-all duration-300 hover:border-purple-400/30 hover:bg-[#1a1528]/90 hover:shadow-[0_0_20px_rgba(124,58,237,0.15)]"
               initial={{ opacity: 0, y: 16 }}
               transition={{ duration: 0.4 }}
             >
@@ -83,11 +138,10 @@ export default function LandingPage() {
                 return (
                   <motion.button
                     animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-2xl border p-5 text-left transition ${
-                      selected
-                        ? 'border-white/40 bg-white/10 shadow-[0_0_30px_rgba(124,58,237,0.25)]'
-                        : 'border-white/15 bg-[#1a1528]/40 hover:border-white/25 hover:bg-[#1a1528]/70'
-                    }`}
+                    className={`rounded-2xl border p-5 text-left transition-all duration-300 backdrop-blur-sm ${selected
+                      ? 'border-white/40 bg-white/15 shadow-[0_0_30px_rgba(124,58,237,0.25)]'
+                      : 'border-white/15 bg-[#1a1528]/60 hover:border-purple-400/40 hover:bg-[#1a1528]/80 hover:shadow-[0_0_25px_rgba(124,58,237,0.2)]'
+                      }`}
                     initial={{ opacity: 0, y: 18 }}
                     key={module.id}
                     onClick={() => setActiveModuleId(module.id)}
@@ -106,7 +160,7 @@ export default function LandingPage() {
               })}
             </div>
 
-            <Card className="border-white/15 bg-[#1a1528]/40 text-slate-100">
+            <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-sm text-slate-100 transition-all duration-300 hover:border-purple-400/30 hover:bg-[#1a1528]/80 hover:shadow-[0_0_20px_rgba(124,58,237,0.15)]">
               <CardHeader>
                 <CardTitle className="inline-flex items-center gap-2 text-xl">
                   <GanttChartSquare className="h-5 w-5 text-purple-300" />
