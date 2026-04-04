@@ -19,10 +19,10 @@ function EmptyState() {
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center py-20 text-center"
     >
-      <div className="p-6 rounded-3xl bg-muted/30 mb-6">
+      <div className="p-6 rounded-3xl glass-surface mb-6">
         <Users className="w-16 h-16 text-muted-foreground/30" />
       </div>
-      <h3 className="text-xl font-bold text-muted-foreground mb-2">No teams yet</h3>
+      <h3 className="text-xl font-bold text-muted-foreground mb-2 glass-text">No teams yet</h3>
       <p className="text-sm text-muted-foreground/70 max-w-xs">
         Say &quot;Add 5 teams&quot; or type it in the command input to get started
       </p>
@@ -30,7 +30,7 @@ function EmptyState() {
         {['add 5 teams', 'add teams alpha beta gamma'].map((cmd) => (
           <code
             key={cmd}
-            className="text-xs px-3 py-1.5 rounded-full bg-primary/5 text-primary border border-primary/10 font-mono"
+            className="text-xs px-3 py-1.5 rounded-full glass-badge font-mono"
           >
             &quot;{cmd}&quot;
           </code>

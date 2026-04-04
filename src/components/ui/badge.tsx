@@ -3,26 +3,26 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 glass-badge',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary text-primary-foreground hover:bg-primary/80',
+          'glass-badge text-primary-foreground',
         secondary:
-          'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'glass-surface text-secondary-foreground',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
+          'border-transparent bg-destructive/20 text-destructive-foreground glass-badge',
         success:
-          'border-transparent bg-success text-success-foreground hover:bg-success/80',
+          'glass-badge-success text-success-foreground',
         warning:
-          'border-transparent bg-warning text-warning-foreground hover:bg-warning/80',
-        outline: 'text-foreground',
-        frozen: 'border-blue-300 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
-        shielded: 'border-blue-400 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300',
-        cursed: 'border-purple-400 bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-300',
-        momentum: 'border-amber-400 bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300',
-        token: 'border-slate-300 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+          'glass-badge-warning text-warning-foreground',
+        outline: 'text-foreground glass-surface',
+        frozen: 'border-blue-300/40 glass-surface text-blue-300',
+        shielded: 'border-blue-400/40 glass-surface text-blue-300',
+        cursed: 'border-purple-400/40 glass-surface text-purple-300',
+        momentum: 'border-amber-400/40 glass-surface text-amber-300',
+        token: 'border-slate-300/40 glass-surface text-slate-300',
       },
     },
     defaultVariants: {

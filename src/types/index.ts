@@ -9,6 +9,7 @@ export type EventStatus = 'planning' | 'live' | 'ended'
 export type TeamStatus = 'active' | 'frozen' | 'disqualified' | 'eliminated' | 'shielded' | 'cursed'
 export type FreezeUntil = 'end_of_round' | 'indefinite' | number
 export type RoundStatus = 'pending' | 'active' | 'complete'
+export type LiveRoundState = 'not_started' | 'in_progress' | 'completed'
 export type TimerState = 'idle' | 'running' | 'paused'
 export type ModifierType = 'tiebreak_bonus' | 'sudden_death' | 'custom_bonus'
 export type ModifierTarget = 'next_correct_team' | 'specific_team' | 'all_teams'
@@ -206,6 +207,8 @@ export interface LiveState {
   teams: Team[]
   scoring_mode: ScoringMode
   round: number
+  total_rounds: number
+  round_state: LiveRoundState
   goal_target?: number
   goal_label?: string
   timer: {
@@ -229,6 +232,7 @@ export type VoiceAction =
   | { action: 'change_mode'; mode: ScoringMode; target?: number; label?: string }
   | { action: 'start_round'; round: number }
   | { action: 'end_round' }
+  | { action: 'set_total_rounds'; total_rounds: number }
   | { action: 'freeze_team'; id: string; until?: FreezeUntil }
   | { action: 'thaw_team'; id: string }
   | { action: 'eliminate_team'; id: string }

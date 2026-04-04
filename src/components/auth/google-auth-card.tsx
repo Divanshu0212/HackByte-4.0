@@ -129,28 +129,28 @@ export function GoogleAuthCard({ targetRoute }: GoogleAuthCardProps) {
   }
 
   return (
-    <Card className="border-white/20 bg-slate-950/70 text-slate-100 backdrop-blur-xl">
+    <Card className="glass-card border-white/20 text-slate-100">
       <CardHeader>
-        <CardTitle className="text-2xl">Access Console</CardTitle>
+        <CardTitle className="text-2xl glass-text">Access Console</CardTitle>
         <CardDescription className="text-slate-300">
           Sign in or sign up with Google, then confirm your phone number to continue.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!isFirebaseConfigured && (
-          <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+          <p className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-200 glass-surface">
             Firebase environment variables are missing. Add them in your local environment to enable Google login.
           </p>
         )}
 
         {user ? (
-          <div className="rounded-lg border border-white/15 bg-white/5 p-4">
+          <div className="rounded-lg glass-surface p-4">
             <p className="text-sm text-slate-300">Signed in as</p>
-            <p className="font-semibold">{user.displayName || user.email}</p>
+            <p className="font-semibold glass-text">{user.displayName || user.email}</p>
           </div>
         ) : (
           <Button
-            className="w-full bg-emerald-400 text-slate-900 hover:bg-emerald-300"
+            className="w-full glass-bright-button"
             disabled={!isFirebaseConfigured || authLoading}
             onClick={handleGoogleSignIn}
             type="button"
@@ -160,12 +160,12 @@ export function GoogleAuthCard({ targetRoute }: GoogleAuthCardProps) {
         )}
 
         <label className="block space-y-2 text-sm text-slate-200">
-          <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-2 glass-text">
             <Phone className="h-4 w-4" />
             Phone Number
           </span>
           <input
-            className="w-full rounded-md border border-white/15 bg-slate-900 px-3 py-2 text-slate-100 outline-none ring-emerald-300 transition focus:ring-2"
+            className="w-full rounded-md glass-input"
             onChange={(event) => setPhoneNumber(event.target.value)}
             placeholder="+91 98765 43210"
             type="tel"
@@ -174,7 +174,7 @@ export function GoogleAuthCard({ targetRoute }: GoogleAuthCardProps) {
         </label>
 
         <Button
-          className="w-full gap-2 bg-violet-500 text-white hover:bg-violet-400"
+          className="w-full gap-2 glass-bright-button"
           disabled={!user || submitting}
           onClick={handleContinue}
           type="button"
@@ -185,13 +185,13 @@ export function GoogleAuthCard({ targetRoute }: GoogleAuthCardProps) {
         </Button>
 
         {user && (
-          <Button className="w-full gap-2" onClick={handleSignOut} type="button" variant="outline">
+          <Button className="w-full gap-2 glass-button" onClick={handleSignOut} type="button" variant="outline">
             <LogOut className="h-4 w-4" />
             Sign Out
           </Button>
         )}
 
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {error && <p className="text-sm text-red-300 glass-surface p-2 rounded border border-red-400/30">{error}</p>}
       </CardContent>
     </Card>
   )

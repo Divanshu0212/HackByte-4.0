@@ -165,8 +165,8 @@ export function TeamCard({ team, rank }: TeamCardProps) {
     >
       <Card
         className={cn(
-          'relative overflow-hidden transition-all h-full hover:shadow-md',
-          isFrozen && 'border-blue-300 bg-blue-50/30 dark:bg-blue-950/10',
+          'relative overflow-hidden transition-all h-full glass-card-hover',
+          isFrozen && 'border-blue-300/40 glass-surface',
           isDefeated && 'border-destructive/20 opacity-60 grayscale',
         )}
       >
@@ -222,7 +222,7 @@ export function TeamCard({ team, rank }: TeamCardProps) {
 
               <div className="flex items-center gap-1.5 mb-1.5">
                 <span className={cn(
-                  'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider',
+                  'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider glass-badge',
                   status.className
                 )}>
                   {status.label}
@@ -235,7 +235,9 @@ export function TeamCard({ team, rank }: TeamCardProps) {
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
                     Score
                   </span>
-                  <AnimatedScore score={team.score} />
+                  <span className="glass-text">
+                    <AnimatedScore score={team.score} />
+                  </span>
                 </div>
                 <ScoreDelta delta={delta} show={showDelta} />
               </div>

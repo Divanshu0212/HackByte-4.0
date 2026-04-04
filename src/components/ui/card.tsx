@@ -8,7 +8,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'elixa-card rounded-xl border shadow-sm',
+      'elixa-card rounded-xl border shadow-sm glass-card',
       className
     )}
     data-elixa-card="true"
@@ -36,7 +36,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-2xl font-semibold leading-none tracking-tight',
+      'text-2xl font-semibold leading-none tracking-tight glass-text',
       className
     )}
     {...props}
