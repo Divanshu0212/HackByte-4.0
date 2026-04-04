@@ -12,23 +12,35 @@ import {
   Timer,
   Undo2,
   Redo2,
-  Settings,
   Volume2,
   Brain,
   Play,
   Loader2,
+  Send,
+  Trophy,
+  ChevronDown,
+  ChevronUp,
+  Megaphone,
+  History,
+  StopCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Leaderboard } from '@/components/leaderboard'
 import { ConfirmationCard } from '@/components/confirmation-card'
+import { TimerDisplay } from '@/components/timer-display'
+import { AnnouncementBanner } from '@/components/announcement-banner'
+import { ActivityFeed, actionsToEntry, type ActivityEntry } from '@/components/activity-feed'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { matchPattern } from '@/lib/pattern-matcher'
 import { getTeamColor, getAvatarUrl } from '@/lib/avatar'
 import type { LiveState, Team, AgentResponse, AgentProposal, VoiceAction } from '@/types'
 
-// Initial state
+// ==============================
+// State Helpers
+// ==============================
+
 const createInitialState = (): LiveState => ({
   event_id: `event_${Date.now()}`,
   teams: [],
@@ -38,7 +50,6 @@ const createInitialState = (): LiveState => ({
   sudden_death: false,
 })
 
-// Generate unique ID
 const generateId = (name: string, existing: Set<string>): string => {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 32) || 'team'
   let id = base
@@ -50,111 +61,90 @@ const generateId = (name: string, existing: Set<string>): string => {
   return id
 }
 
+// Quick command chips
+const QUICK_COMMANDS = [
+  { label: 'Add 5 Teams', command: 'add 5 teams' },
+  { label: 'Start Round 1', command: 'start round 1' },
+  { label: 'Next Round', command: 'next round' },
+  { label: 'Timer 5min', command: 'start timer 5 minutes' },
+  { label: 'Undo', command: 'undo' },
+]
+
+// ==============================
+// Main Component
+// ==============================
+
 export default function HomePage() {
-  const [setupPhase, setSetupPhase] = useState<'setup' | 'compiling' | 'live'>('setup')
+  // ===== Phase State =====
+  const [setupPhase, setSetupPhase] = useState<'setup' | 'compiling' | 'live' | 'ended'>('setup')
   const [eventDescription, setEventDescription] = useState('')
-  const [scoringMode, setScoringMode] = useState<'numeric' | 'goal_based' | 'pass_fail'>('numeric')
-  const [compiledRules, setCompiledRules] = useState<any>(null)
+  const [compiledRules, setCompiledRules] = useState<Record<string, unknown> | null>(null)
+
+  // ===== Live State =====
   const [state, setState] = useState<LiveState>(createInitialState())
-  const [isListening, setIsListening] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [typedCommand, setTypedCommand] = useState('')
   const [lastTranscript, setLastTranscript] = useState('')
   const [agentTrace, setAgentTrace] = useState('')
   const [pendingProposal, setPendingProposal] = useState<AgentProposal | null>(null)
   const [pendingActions, setPendingActions] = useState<VoiceAction[]>([])
+  const [activeAnnouncement, setActiveAnnouncement] = useState<string | null>(null)
+  const [activityLog, setActivityLog] = useState<ActivityEntry[]>([])
+  const [postEventSummary, setPostEventSummary] = useState<Record<string, unknown> | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
+  // ===== Collapsed Sections =====
+  const [showTrace, setShowTrace] = useState(false)
+  const [showTranscript, setShowTranscript] = useState(true)
+  const [showActivity, setShowActivity] = useState(true)
+
+  // ===== Refs =====
   const stateRef = useRef<LiveState>(state)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
   const historyRef = useRef<LiveState[]>([])
   const futureRef = useRef<LiveState[]>([])
+  const commandInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     stateRef.current = state
   }, [state])
 
-  // Speech recognition setup
+  // ===== Speech Recognition =====
+  const { isListening, lastError: speechError, start: startListening, stop: stopListening } = useSpeechRecognition(
+    (transcript) => {
+      if (!isProcessing) {
+        void handleVoiceCommand(transcript)
+      }
+    }
+  )
+
+  // ===== Persist state to MongoDB (debounced) =====
+  const persistRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (typeof window === 'undefined' || setupPhase !== 'live') return
+    if (setupPhase !== 'live') return
+    if (persistRef.current) clearTimeout(persistRef.current)
+    persistRef.current = setTimeout(() => {
+      fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_event',
+          eventId: state.event_id,
+          data: {
+            ...state,
+            eventDescription,
+            compiledRules,
+          },
+        }),
+      }).catch((e) => console.warn('Persist failed:', e))
+    }, 2000)
+    return () => { if (persistRef.current) clearTimeout(persistRef.current) }
+  }, [state, setupPhase, eventDescription, compiledRules])
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SpeechRecognition) {
-      toast.error('Speech recognition not supported in this browser')
-      return
-    }
-
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = false
-    recognition.lang = 'en-US'
-
-    recognition.onresult = (event) => {
-      const last = event.results[event.results.length - 1]
-      if (last.isFinal) {
-        const transcript = last[0].transcript.trim()
-        if (transcript) {
-          handleVoiceCommand(transcript)
-        }
-      }
-    }
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error)
-      if (event.error !== 'no-speech' && event.error !== 'aborted') {
-        toast.error(`Speech error: ${event.error}`)
-        setIsListening(false)
-      }
-    }
-
-    recognition.onend = () => {
-      // Only auto-restart if we're still in listening mode
-      setIsListening((listening) => {
-        if (listening && setupPhase === 'live') {
-          try {
-            recognition.start()
-          } catch (e) {
-            console.error('Failed to restart recognition:', e)
-            return false
-          }
-        }
-        return listening
-      })
-    }
-
-    recognitionRef.current = recognition
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort()
-      }
-    }
-  }, [setupPhase])
-
-  // Toggle listening
-  const toggleListening = useCallback(() => {
-    if (!recognitionRef.current) return
-
-    if (isListening) {
-      recognitionRef.current.stop()
-      setIsListening(false)
-      toast.info('Stopped listening')
-    } else {
-      try {
-        recognitionRef.current.start()
-        setIsListening(true)
-        toast.success('Listening for commands...')
-      } catch (e) {
-        toast.error('Failed to start speech recognition')
-      }
-    }
-  }, [isListening])
-
-  // Apply actions to state
+  // ===== Apply Actions =====
   const applyActions = useCallback((actions: VoiceAction[]) => {
-    console.log('[Apply Actions] Applying actions:', actions)
     setState((prev) => {
-      console.log('[Apply Actions] Previous state:', prev.teams.length, 'teams')
-      // Save to history for undo
       historyRef.current.push(structuredClone(prev))
+      if (historyRef.current.length > 50) historyRef.current.shift()
       futureRef.current = []
 
       let newState = structuredClone(prev)
@@ -165,25 +155,18 @@ export default function HomePage() {
             if ('teams' in action && Array.isArray(action.teams)) {
               const existingIds = new Set(newState.teams.map((t) => t.id))
               const newTeams: Team[] = action.teams.map((t, i) => {
-                const id = t.id && !existingIds.has(t.id)
-                  ? t.id
-                  : generateId(t.name, existingIds)
+                const id = t.id && !existingIds.has(t.id) ? t.id : generateId(t.name, existingIds)
                 existingIds.add(id)
                 const color = t.color || getTeamColor(newState.teams.length + i)
                 return {
-                  id,
-                  name: t.name,
-                  score: t.score || 0,
-                  color,
+                  id, name: t.name, score: t.score || 0, color,
                   avatar_url: getAvatarUrl(id, 'bottts', { backgroundColor: color }),
-                  live_status: 'active',
-                  created_at: Date.now(),
-                  updated_at: Date.now(),
-                }
+                  live_status: 'active', created_at: Date.now(), updated_at: Date.now(),
+                } as Team
               })
               newState.teams = [...newState.teams, ...newTeams]
             } else if ('count' in action) {
-              const count = action.count
+              const count = action.count as number
               const existingIds = new Set(newState.teams.map((t) => t.id))
               const newTeams: Team[] = Array.from({ length: count }, (_, i) => {
                 const name = `Team ${newState.teams.length + i + 1}`
@@ -191,15 +174,10 @@ export default function HomePage() {
                 existingIds.add(id)
                 const color = getTeamColor(newState.teams.length + i)
                 return {
-                  id,
-                  name,
-                  score: 0,
-                  color,
+                  id, name, score: 0, color,
                   avatar_url: getAvatarUrl(id, 'bottts', { backgroundColor: color }),
-                  live_status: 'active',
-                  created_at: Date.now(),
-                  updated_at: Date.now(),
-                }
+                  live_status: 'active', created_at: Date.now(), updated_at: Date.now(),
+                } as Team
               })
               newState.teams = [...newState.teams, ...newTeams]
             }
@@ -207,64 +185,92 @@ export default function HomePage() {
           }
 
           case 'update_score': {
-            const teamIndex = newState.teams.findIndex((t) => t.id === action.id)
-            if (teamIndex >= 0) {
-              newState.teams[teamIndex].score += action.delta
-              newState.teams[teamIndex].updated_at = Date.now()
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              // Check freeze status
+              if (newState.teams[ti].live_status === 'frozen') {
+                // Frozen teams get delta = 0
+                toast.info(`${newState.teams[ti].name} is frozen — no score change`)
+              } else {
+                newState.teams[ti].score += action.delta
+                newState.teams[ti].updated_at = Date.now()
+              }
             }
             break
           }
 
           case 'set_score': {
-            const teamIndex = newState.teams.findIndex((t) => t.id === action.id)
-            if (teamIndex >= 0) {
-              newState.teams[teamIndex].score = action.score
-              newState.teams[teamIndex].updated_at = Date.now()
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              newState.teams[ti].score = action.score
+              newState.teams[ti].updated_at = Date.now()
+            }
+            break
+          }
+
+          case 'rename_team': {
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              newState.teams[ti].name = action.new_name
+              newState.teams[ti].updated_at = Date.now()
             }
             break
           }
 
           case 'freeze_team': {
-            const teamIndex = newState.teams.findIndex((t) => t.id === action.id)
-            if (teamIndex >= 0) {
-              newState.teams[teamIndex].live_status = 'frozen'
-              newState.teams[teamIndex].freeze_until = action.until
-              newState.teams[teamIndex].updated_at = Date.now()
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              newState.teams[ti].live_status = 'frozen'
+              newState.teams[ti].freeze_until = action.until
+              newState.teams[ti].updated_at = Date.now()
             }
             break
           }
 
           case 'thaw_team': {
-            const teamIndex = newState.teams.findIndex((t) => t.id === action.id)
-            if (teamIndex >= 0) {
-              newState.teams[teamIndex].live_status = 'active'
-              newState.teams[teamIndex].freeze_until = undefined
-              newState.teams[teamIndex].updated_at = Date.now()
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              newState.teams[ti].live_status = 'active'
+              newState.teams[ti].freeze_until = undefined
+              newState.teams[ti].updated_at = Date.now()
             }
             break
           }
 
           case 'eliminate_team':
           case 'disqualify_team': {
-            const teamIndex = newState.teams.findIndex((t) => t.id === action.id)
-            if (teamIndex >= 0) {
-              newState.teams[teamIndex].live_status = action.action === 'disqualify_team' ? 'disqualified' : 'eliminated'
-              newState.teams[teamIndex].updated_at = Date.now()
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              newState.teams[ti].live_status = action.action === 'disqualify_team' ? 'disqualified' : 'eliminated'
+              newState.teams[ti].updated_at = Date.now()
+            }
+            break
+          }
+
+          case 'revive_team': {
+            const ti = newState.teams.findIndex((t) => t.id === action.id)
+            if (ti >= 0) {
+              newState.teams[ti].live_status = 'active'
+              newState.teams[ti].updated_at = Date.now()
             }
             break
           }
 
           case 'timer': {
             if (action.state === 'start') {
+              const dur = action.duration || 60
               newState.timer = {
                 state: 'running',
-                duration_sec: action.duration || 60,
-                ends_at: Date.now() + (action.duration || 60) * 1000,
+                duration_sec: dur,
+                ends_at: Date.now() + dur * 1000,
               }
             } else if (action.state === 'stop' || action.state === 'reset') {
               newState.timer = { state: 'idle', duration_sec: newState.timer.duration_sec }
             } else if (action.state === 'pause') {
-              newState.timer = { ...newState.timer, state: 'paused' }
+              if (newState.timer.state === 'running' && newState.timer.ends_at) {
+                const remaining = Math.max(0, newState.timer.ends_at - Date.now())
+                newState.timer = { ...newState.timer, state: 'paused', duration_sec: Math.ceil(remaining / 1000) }
+              }
             }
             break
           }
@@ -276,6 +282,42 @@ export default function HomePage() {
 
           case 'end_round': {
             newState.round += 1
+            // Tick timed effects
+            newState.teams = newState.teams.map(t => {
+              const next = { ...t }
+              if (next.shield_rounds_remaining && next.shield_rounds_remaining > 0) {
+                next.shield_rounds_remaining -= 1
+                if (next.shield_rounds_remaining === 0 && next.live_status === 'shielded') {
+                  next.live_status = 'active'
+                }
+              }
+              if (next.cursed_rounds_remaining && next.cursed_rounds_remaining > 0) {
+                next.cursed_rounds_remaining -= 1
+                if (next.cursed_rounds_remaining === 0 && next.live_status === 'cursed') {
+                  next.live_status = 'active'
+                }
+              }
+              // Unfreeze teams with end_of_round
+              if (next.live_status === 'frozen' && next.freeze_until === 'end_of_round') {
+                next.live_status = 'active'
+                next.freeze_until = undefined
+              }
+              return next
+            })
+            break
+          }
+
+          case 'create_announcement': {
+            setActiveAnnouncement(action.message)
+            break
+          }
+
+          case 'manual_correction': {
+            const ti = newState.teams.findIndex((t) => t.id === action.team_id)
+            if (ti >= 0) {
+              newState.teams[ti].score = action.new_score
+              newState.teams[ti].updated_at = Date.now()
+            }
             break
           }
 
@@ -294,37 +336,76 @@ export default function HomePage() {
             }
             break
           }
+
+          case 'change_mode': {
+            newState.scoring_mode = action.mode
+            if (action.target) newState.goal_target = action.target
+            if (action.label) newState.goal_label = action.label
+            break
+          }
         }
       }
 
       stateRef.current = newState
-      console.log('[Apply Actions] New state:', newState.teams.length, 'teams')
       return newState
     })
   }, [])
 
-  // Handle voice command
+  // Persist score events to MongoDB
+  const persistScoreEvent = useCallback(async (actions: VoiceAction[], source: string) => {
+    for (const action of actions) {
+      if (action.action === 'update_score' || action.action === 'set_score') {
+        try {
+          await fetch('/api/persist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'save_score_event',
+              eventId: stateRef.current.event_id,
+              data: {
+                ...action,
+                source,
+                round: stateRef.current.round,
+                timestamp: Date.now(),
+              },
+            }),
+          })
+        } catch (e) {
+          console.warn('Score persist failed:', e)
+        }
+      }
+    }
+  }, [])
+
+  // ===== Handle Voice Command (core routing) =====
   const handleVoiceCommand = useCallback(async (transcript: string) => {
     setLastTranscript(transcript)
     const currentState = stateRef.current
 
-    // Step 1: Try pattern matching first (fast, local)
+    // Step 1: Try pattern matching first (fast, local, <50ms)
     const patternResult = matchPattern(transcript, currentState)
 
     if (patternResult.matched) {
       setAgentTrace(`Pattern Match (instant)\n\nMatched: "${transcript}"\nActions: ${JSON.stringify(patternResult.actions, null, 2)}`)
       applyActions(patternResult.actions)
 
+      // Add to activity log
+      const entry = actionsToEntry(patternResult.actions, 'pattern', currentState.teams)
+      if (entry) setActivityLog(prev => [entry, ...prev])
+
+      // Persist score events
+      void persistScoreEvent(patternResult.actions, 'pattern')
+
       // Speak commentary
       if (patternResult.commentary) {
-        speakCommentary(patternResult.commentary)
+        void speakCommentary(patternResult.commentary)
       }
 
       toast.success('Command executed')
       return
     }
 
-    // Step 2: No pattern match - call Gemini agent
+    // Step 2: No pattern match — call Gemini agent
     setIsProcessing(true)
     setAgentTrace('Calling Gemini agent...')
 
@@ -336,7 +417,7 @@ export default function HomePage() {
           command: transcript,
           liveState: currentState,
           ruleManifest: currentState.rule_manifest,
-          conversationHistory: [],
+          conversationHistory: activityLog.slice(0, 10).map(e => e.description),
         }),
       })
 
@@ -357,6 +438,21 @@ export default function HomePage() {
 
       setAgentTrace(`Gemini Agent Response\n\n${trace}`)
 
+      // Log agent call to MongoDB
+      fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_agent_log',
+          eventId: currentState.event_id,
+          data: {
+            command: transcript,
+            response: agentResponse,
+            timestamp: Date.now(),
+          },
+        }),
+      }).catch((e) => console.warn('Agent log persist failed:', e))
+
       // Check for proposal requiring confirmation
       if (agentResponse.proposal) {
         setPendingProposal(agentResponse.proposal)
@@ -367,12 +463,17 @@ export default function HomePage() {
       // Apply actions directly
       if (agentResponse.actions.length > 0) {
         applyActions(agentResponse.actions)
+        void persistScoreEvent(agentResponse.actions, 'agent')
+
+        const entry = actionsToEntry(agentResponse.actions, 'agent', currentState.teams)
+        if (entry) setActivityLog(prev => [entry, ...prev])
+
         toast.success('Agent command executed')
       }
 
       // Speak commentary
       if (agentResponse.commentary) {
-        speakCommentary(agentResponse.commentary)
+        void speakCommentary(agentResponse.commentary)
       }
     } catch (error) {
       console.error('Agent error:', error)
@@ -381,18 +482,19 @@ export default function HomePage() {
     } finally {
       setIsProcessing(false)
     }
-  }, [applyActions])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyActions, persistScoreEvent, activityLog])
 
+  // ===== Text Command Submit =====
   const handleTextCommandSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const command = typedCommand.trim()
     if (!command || isProcessing) return
-
     setTypedCommand('')
     void handleVoiceCommand(command)
   }, [typedCommand, isProcessing, handleVoiceCommand])
 
-  // Speak commentary using ElevenLabs or fallback
+  // ===== Speech (ElevenLabs + fallback) =====
   const speakCommentary = useCallback(async (text: string) => {
     try {
       const response = await fetch('/api/voice', {
@@ -400,69 +502,66 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-
       const result = await response.json()
-
       if (result.data?.audio) {
-        // Play ElevenLabs audio
         const audio = new Audio(`data:audio/mpeg;base64,${result.data.audio}`)
         audio.play()
       } else {
-        // Fallback to Web Speech API
         const utterance = new SpeechSynthesisUtterance(text)
         utterance.rate = 1.1
         speechSynthesis.speak(utterance)
       }
-    } catch (error) {
-      // Fallback to Web Speech API
+    } catch {
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.rate = 1.1
       speechSynthesis.speak(utterance)
     }
   }, [])
 
-  // Handle proposal confirmation
+  // ===== Proposal Handlers =====
   const handleConfirmProposal = useCallback(() => {
     if (pendingActions.length > 0) {
       applyActions(pendingActions)
+      void persistScoreEvent(pendingActions, 'agent')
+
+      const entry = actionsToEntry(pendingActions, 'agent', stateRef.current.teams)
+      if (entry) setActivityLog(prev => [entry, ...prev])
+
       toast.success('Changes applied')
     }
     setPendingProposal(null)
     setPendingActions([])
-  }, [pendingActions, applyActions])
+  }, [pendingActions, applyActions, persistScoreEvent])
 
-  // Handle proposal cancel
   const handleCancelProposal = useCallback(() => {
     setPendingProposal(null)
     setPendingActions([])
     toast.info('Changes cancelled')
   }, [])
 
-  // Undo/Redo
+  // ===== Undo/Redo =====
   const canUndo = historyRef.current.length > 0
   const canRedo = futureRef.current.length > 0
 
   const handleUndo = useCallback(() => {
-    if (canUndo) {
-      applyActions([{ action: 'undo' }])
-      toast.info('Undone')
-    }
-  }, [canUndo, applyActions])
+    applyActions([{ action: 'undo' }])
+    toast.info('Undone')
+    setActivityLog(prev => [{
+      id: `undo_${Date.now()}`, timestamp: Date.now(), action: 'undo', description: 'Last action undone', source: 'pattern',
+    }, ...prev])
+  }, [applyActions])
 
   const handleRedo = useCallback(() => {
-    if (canRedo) {
-      applyActions([{ action: 'redo' }])
-      toast.info('Redone')
-    }
-  }, [canRedo, applyActions])
+    applyActions([{ action: 'redo' }])
+    toast.info('Redone')
+  }, [applyActions])
 
-  // Setup Phase Handlers
+  // ===== Setup Phase Handlers =====
   const handleCompileRules = async () => {
     if (!eventDescription.trim()) {
       toast.error('Please enter an event description')
       return
     }
-
     setSetupPhase('compiling')
     try {
       const response = await fetch('/api/compile-rules', {
@@ -470,9 +569,7 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ description: eventDescription }),
       })
-
       if (!response.ok) throw new Error('Failed to compile rules')
-
       const data = await response.json()
       setCompiledRules(data.data.manifest)
       toast.success('Rules compiled successfully! Review below.')
@@ -487,14 +584,168 @@ export default function HomePage() {
   const handleStartEvent = () => {
     setState((prev) => ({
       ...prev,
-      scoring_mode: scoringMode,
       event_id: `event_${Date.now()}`,
     }))
     setSetupPhase('live')
     toast.success('Event started! Use voice commands to manage.')
   }
 
-  // Render setup screen
+  const handleEndEvent = async () => {
+    setSetupPhase('ended')
+    stopListening()
+    setSummaryLoading(true)
+    try {
+      const response = await fetch('/api/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: state.event_id,
+          eventName: eventDescription || 'Event',
+          teams: state.teams,
+          rounds: state.round,
+        }),
+      })
+      const result = await response.json()
+      if (result.success) {
+        setPostEventSummary(result.data)
+      }
+    } catch (e) {
+      console.error('Summary failed:', e)
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
+  const handleNewEvent = () => {
+    setState(createInitialState())
+    setActivityLog([])
+    setAgentTrace('')
+    setLastTranscript('')
+    setPostEventSummary(null)
+    setCompiledRules(null)
+    setEventDescription('')
+    setSetupPhase('setup')
+    historyRef.current = []
+    futureRef.current = []
+  }
+
+  // ===== Keyboard shortcut =====
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); handleUndo() }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); handleRedo() }
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        commandInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleUndo, handleRedo])
+
+  // =================================================
+  // RENDER: Post-Event Summary
+  // =================================================
+  if (setupPhase === 'ended') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-3xl space-y-6"
+        >
+          <Card className="border-2 border-primary/20 shadow-xl">
+            <CardHeader className="text-center space-y-3">
+              <div className="flex justify-center">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20">
+                  <Trophy className="w-10 h-10 text-primary" />
+                </div>
+              </div>
+              <CardTitle className="text-3xl">Event Complete!</CardTitle>
+              <CardDescription>Here&apos;s your post-event summary</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Winner */}
+              {state.teams.length > 0 && (
+                <div className="text-center p-6 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/20 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Winner</p>
+                  <p className="text-2xl font-bold">
+                    🏆 {[...state.teams].sort((a, b) => b.score - a.score)[0]?.name}
+                  </p>
+                  <p className="text-lg font-mono text-amber-700 dark:text-amber-300">
+                    {[...state.teams].sort((a, b) => b.score - a.score)[0]?.score} points
+                  </p>
+                </div>
+              )}
+
+              {/* Final Standings */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Final Standings</h3>
+                <div className="space-y-1.5">
+                  {[...state.teams].sort((a, b) => b.score - a.score).map((team, i) => (
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-primary/10 text-primary">
+                          {i + 1}
+                        </span>
+                        <span className="font-medium">{team.name}</span>
+                      </div>
+                      <span className="font-mono font-bold">{team.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI Summary */}
+              {summaryLoading && (
+                <div className="flex items-center justify-center gap-2 p-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Generating AI summary...</span>
+                </div>
+              )}
+
+              {postEventSummary && (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                    <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
+                      <Brain className="w-4 h-4" />
+                      AI Summary
+                    </h3>
+                    <p className="text-sm leading-relaxed">{String(postEventSummary.summary || '')}</p>
+                  </div>
+
+                  {Array.isArray(postEventSummary.highlights) && postEventSummary.highlights.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-muted-foreground mb-2">Highlights</h3>
+                      <ul className="space-y-1.5">
+                        {(postEventSummary.highlights as string[]).map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm">
+                            <Sparkles className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                            {h}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <Button onClick={handleNewEvent} className="flex-1">
+                  <Sparkles className="w-4 h-4" />
+                  New Event
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // =================================================
+  // RENDER: Setup Screen
+  // =================================================
   if (setupPhase !== 'live') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-primary/5">
@@ -503,65 +754,39 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-2xl"
         >
-          <Card className="border-2">
-            <CardHeader className="text-center space-y-2">
+          <Card className="border-2 shadow-xl">
+            <CardHeader className="text-center space-y-3">
               <div className="flex justify-center">
-                <div className="flex items-center gap-2 font-bold text-3xl">
-                  <Sparkles className="w-8 h-8 text-primary" />
+                <motion.div
+                  animate={{ rotate: [0, 5, -5, 0] }}
+                  transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+                  className="flex items-center gap-2 font-bold text-4xl"
+                >
+                  <Sparkles className="w-10 h-10 text-primary" />
                   <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
                     Elixa
                   </span>
-                </div>
+                </motion.div>
               </div>
               <CardTitle className="text-2xl">Setup Your Event</CardTitle>
-              <CardDescription>
-                Describe your game, quiz, or competition in natural language
+              <CardDescription className="max-w-md mx-auto">
+                Describe your game, quiz, or competition in natural language. AI will compile rules and power voice commands.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Event Description */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Event Description</label>
+                <label className="text-sm font-medium" htmlFor="event-description">Event Description</label>
                 <textarea
-                  className="w-full min-h-[200px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="Describe your event... For example:&#10;&#10;'A trivia quiz with 5 rounds. Teams earn 10 points for correct answers and lose 5 for wrong ones. Top 3 teams get badges. Teams can freeze opponents or get immunity shields.'"
+                  id="event-description"
+                  className="w-full min-h-[180px] px-4 py-3 rounded-xl border border-input bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                  placeholder={"Describe your event... For example:\n\n'A trivia quiz with 5 rounds. Teams earn 10 points for correct answers and lose 5 for wrong ones. Top 3 teams advance. Freeze punishment for repeated wrong answers.'"}
                   value={eventDescription}
                   onChange={(e) => setEventDescription(e.target.value)}
                 />
               </div>
 
-              {/* Scoring Mode */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Scoring Mode</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    variant={scoringMode === 'numeric' ? 'default' : 'outline'}
-                    onClick={() => setScoringMode('numeric')}
-                    className="h-auto py-3 flex-col"
-                  >
-                    <Zap className="w-5 h-5 mb-1" />
-                    Numeric
-                  </Button>
-                  <Button
-                    variant={scoringMode === 'goal_based' ? 'default' : 'outline'}
-                    onClick={() => setScoringMode('goal_based')}
-                    className="h-auto py-3 flex-col"
-                  >
-                    <Timer className="w-5 h-5 mb-1" />
-                    Goal Based
-                  </Button>
-                  <Button
-                    variant={scoringMode === 'pass_fail' ? 'default' : 'outline'}
-                    onClick={() => setScoringMode('pass_fail')}
-                    className="h-auto py-3 flex-col"
-                  >
-                    <Users className="w-5 h-5 mb-1" />
-                    Pass/Fail
-                  </Button>
-                </div>
-              </div>
-
-              {/* Compiled Rules Preview & Editor */}
+              {/* Compiled Rules Preview */}
               {compiledRules && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -571,32 +796,24 @@ export default function HomePage() {
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <Brain className="w-4 h-4 text-primary" />
-                      Compiled Rules (Review & Edit)
+                      Compiled Rules
                     </label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCompiledRules(null)}
-                    >
-                      Clear
-                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCompiledRules(null)}>Clear</Button>
                   </div>
                   <textarea
-                    className="w-full min-h-[300px] px-3 py-2 rounded-md border border-input bg-background text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full min-h-[250px] px-3 py-2 rounded-xl border border-input bg-muted/30 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                     value={JSON.stringify(compiledRules, null, 2)}
                     onChange={(e) => {
-                      try {
-                        const parsed = JSON.parse(e.target.value)
-                        setCompiledRules(parsed)
-                      } catch (err) {
-                        // Invalid JSON, don't update yet
-                      }
+                      try { setCompiledRules(JSON.parse(e.target.value)) } catch { /* invalid */ }
                     }}
                   />
-                  <div className="text-xs text-muted-foreground">
-                    ✓ {compiledRules.triggers?.length || 0} triggers •
-                    {compiledRules.statusValues?.length || 0} status values •
-                    {compiledRules.tokens?.length || 0} tokens
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <Badge variant="secondary">
+                      {(compiledRules as Record<string, unknown[]>).triggers?.length || 0} triggers
+                    </Badge>
+                    <Badge variant="secondary">
+                      {(compiledRules as Record<string, unknown[]>).statusValues?.length || 0} status values
+                    </Badge>
                   </div>
                 </motion.div>
               )}
@@ -610,29 +827,19 @@ export default function HomePage() {
                   variant="outline"
                 >
                   {setupPhase === 'compiling' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Compiling Rules...
-                    </>
+                    <><Loader2 className="w-4 h-4 animate-spin" />Compiling...</>
                   ) : (
-                    <>
-                      <Brain className="w-4 h-4" />
-                      Compile Rules with AI
-                    </>
+                    <><Brain className="w-4 h-4" />Compile Rules</>
                   )}
                 </Button>
-                <Button
-                  onClick={handleStartEvent}
-                  disabled={!eventDescription.trim()}
-                  className="flex-1"
-                >
+                <Button onClick={handleStartEvent} className="flex-1">
                   <Play className="w-4 h-4" />
                   Start Event
                 </Button>
               </div>
 
               <p className="text-xs text-center text-muted-foreground">
-                You can start without compiling rules. AI will adapt to your commands in real-time.
+                You can start without compiling rules — AI adapts to your commands in real-time.
               </p>
             </CardContent>
           </Card>
@@ -641,205 +848,288 @@ export default function HomePage() {
     )
   }
 
+  // =================================================
+  // RENDER: Live Event
+  // =================================================
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Announcement Banner */}
+      <AnnouncementBanner
+        message={activeAnnouncement}
+        onDismiss={() => setActiveAnnouncement(null)}
+      />
+
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-lg">
-        <div className="container flex items-center justify-between h-16 px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 font-bold text-xl">
-              <Sparkles className="w-5 h-5 text-primary" />
+      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl">
+        <div className="flex items-center justify-between h-14 px-4 max-w-[1600px] mx-auto">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 font-bold text-lg">
+              <Sparkles className="w-4.5 h-4.5 text-primary" />
               <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
                 Elixa
               </span>
             </div>
-            <Badge variant="secondary" className="hidden sm:flex">
-              AI-Powered Events
+            <Badge variant="secondary" className="hidden sm:flex text-[10px]">
+              LIVE
             </Badge>
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <Zap className="w-4 h-4" />
-              <span>Round {state.round}</span>
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Round</span> {state.round}
             </div>
-            <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4" />
-              <span>{state.teams.length} teams</span>
+            <div className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" />
+              <span>{state.teams.length}</span>
+              <span className="hidden sm:inline">teams</span>
             </div>
-            <Badge variant="outline" className="capitalize">
-              {state.scoring_mode.replace('_', ' ')}
-            </Badge>
             {state.sudden_death && (
-              <Badge variant="destructive">Late-stage</Badge>
+              <Badge variant="destructive" className="text-[10px]">SUDDEN DEATH</Badge>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive h-8 px-2"
+              onClick={handleEndEvent}
+            >
+              <StopCircle className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline ml-1">End</span>
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 container grid lg:grid-cols-[1fr_400px] gap-6 p-6">
-        {/* Leaderboard */}
-        <main>
-          <Leaderboard teams={state.teams} />
-        </main>
-
-        {/* Operator Console */}
-        <aside className="space-y-4">
-          {/* Mic Control */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                Operator Console
-                <Button variant="ghost" size="icon" className="ml-auto h-8 w-8">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Voice + text controlled event management
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form onSubmit={handleTextCommandSubmit} className="flex gap-2">
-                <input
-                  type="text"
-                  value={typedCommand}
-                  onChange={(e) => setTypedCommand(e.target.value)}
-                  placeholder="Type command (e.g. Team 1 plus 10)"
-                  className="flex-1 h-11 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  disabled={isProcessing}
-                />
-                <Button
-                  type="submit"
-                  className="h-11"
-                  disabled={isProcessing || typedCommand.trim().length === 0}
-                >
-                  Send
-                </Button>
-              </form>
-
-              {/* Mic Button */}
-              <Button
-                size="xl"
-                variant={isListening ? 'destructive' : 'default'}
-                className="w-full"
-                onClick={toggleListening}
-              >
-                {isListening ? (
-                  <>
-                    <motion.span
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                    >
-                      <MicOff className="w-5 h-5" />
-                    </motion.span>
-                    Stop Listening
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-5 h-5" />
-                    Start Listening
-                  </>
-                )}
-              </Button>
-
-              {isListening && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 text-sm text-success"
-                >
-                  <motion.span
-                    animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                    className="w-2 h-2 rounded-full bg-success"
-                  />
-                  Listening for commands...
-                </motion.div>
-              )}
-
-              {/* Undo/Redo */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  disabled={!canUndo}
-                  onClick={handleUndo}
-                >
-                  <Undo2 className="w-4 h-4 mr-1" />
-                  Undo
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  disabled={!canRedo}
-                  onClick={handleRedo}
-                >
-                  <Redo2 className="w-4 h-4 mr-1" />
-                  Redo
-                </Button>
-              </div>
-
-              {/* Processing Indicator */}
-              <AnimatePresence>
-                {isProcessing && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary"
-                  >
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm font-medium">Processing...</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </CardContent>
-          </Card>
-
-          {/* Pending Proposal */}
+      <div className="flex-1 max-w-[1600px] mx-auto w-full grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-0 lg:gap-0">
+        {/* Leaderboard Area */}
+        <main className="p-4 sm:p-6 overflow-auto lg:border-r lg:border-border/50">
+          {/* Timer */}
           <AnimatePresence>
-            {pendingProposal && (
-              <ConfirmationCard
-                proposal={pendingProposal}
-                onConfirm={handleConfirmProposal}
-                onCancel={handleCancelProposal}
-                isProcessing={isProcessing}
-              />
+            {state.timer.state !== 'idle' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4"
+              >
+                <TimerDisplay timer={state.timer} />
+              </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Transcript */}
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-                <Volume2 className="w-4 h-4" />
-                Last Transcript
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm font-mono bg-muted p-3 rounded-lg min-h-[60px]">
-                {lastTranscript || 'Waiting for voice input...'}
-              </p>
-            </CardContent>
-          </Card>
+          <Leaderboard teams={state.teams} />
+        </main>
 
-          {/* Agent Trace */}
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-                <Brain className="w-4 h-4" />
-                Agent Reasoning
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="text-xs font-mono bg-muted p-3 rounded-lg overflow-auto max-h-[200px] whitespace-pre-wrap">
+        {/* Operator Console Sidebar */}
+        <aside className="border-t lg:border-t-0 lg:border-l border-border/50 bg-card/50 overflow-y-auto lg:max-h-[calc(100vh-56px)] lg:sticky lg:top-14">
+          <div className="p-4 space-y-4">
+            {/* Console Header */}
+            <div>
+              <h2 className="text-base font-bold">Operator Console</h2>
+              <p className="text-xs text-muted-foreground">Voice + text controlled event management</p>
+            </div>
+
+            {/* Command Input */}
+            <form onSubmit={handleTextCommandSubmit} className="flex gap-2">
+              <input
+                ref={commandInputRef}
+                type="text"
+                value={typedCommand}
+                onChange={(e) => setTypedCommand(e.target.value)}
+                placeholder="Type command... (/ to focus)"
+                className="flex-1 h-10 px-3 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                disabled={isProcessing}
+              />
+              <Button
+                type="submit"
+                size="default"
+                className="h-10 px-3"
+                disabled={isProcessing || typedCommand.trim().length === 0}
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </form>
+
+            {/* Quick Command Chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {QUICK_COMMANDS.map((qc) => (
+                <button
+                  key={qc.command}
+                  type="button"
+                  onClick={() => void handleVoiceCommand(qc.command)}
+                  disabled={isProcessing}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full border border-border bg-background hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50"
+                >
+                  <Zap className="w-3 h-3" />
+                  {qc.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Mic Button */}
+            <Button
+              size="lg"
+              variant={isListening ? 'destructive' : 'default'}
+              className="w-full h-12"
+              onClick={isListening ? stopListening : startListening}
+            >
+              {isListening ? (
+                <>
+                  <motion.span
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                  >
+                    <MicOff className="w-5 h-5" />
+                  </motion.span>
+                  Stop Listening
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5" />
+                  Start Listening
+                </>
+              )}
+            </Button>
+
+            {isListening && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center gap-2 text-xs text-success"
+              >
+                <motion.span
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  className="w-2 h-2 rounded-full bg-success"
+                />
+                Listening for commands...
+              </motion.div>
+            )}
+
+            {speechError && (
+              <p className="text-xs text-destructive bg-destructive/10 p-2 rounded-lg">{speechError}</p>
+            )}
+
+            {/* Undo/Redo */}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-9" disabled={!canUndo} onClick={handleUndo}>
+                <Undo2 className="w-3.5 h-3.5 mr-1" />
+                Undo
+              </Button>
+              <Button variant="outline" className="flex-1 h-9" disabled={!canRedo} onClick={handleRedo}>
+                <Redo2 className="w-3.5 h-3.5 mr-1" />
+                Redo
+              </Button>
+            </div>
+
+            {/* Processing Indicator */}
+            <AnimatePresence>
+              {isProcessing && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary"
+                >
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm font-medium">Agent processing...</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Pending Proposal */}
+            <AnimatePresence>
+              {pendingProposal && (
+                <ConfirmationCard
+                  proposal={pendingProposal}
+                  onConfirm={handleConfirmProposal}
+                  onCancel={handleCancelProposal}
+                  isProcessing={isProcessing}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Activity Feed */}
+            <CollapsibleSection
+              title="Activity"
+              icon={<History className="w-3.5 h-3.5" />}
+              open={showActivity}
+              onToggle={() => setShowActivity(!showActivity)}
+            >
+              <ActivityFeed entries={activityLog} />
+            </CollapsibleSection>
+
+            {/* Transcript */}
+            <CollapsibleSection
+              title="Last Transcript"
+              icon={<Volume2 className="w-3.5 h-3.5" />}
+              open={showTranscript}
+              onToggle={() => setShowTranscript(!showTranscript)}
+            >
+              <pre className="text-xs font-mono bg-muted p-3 rounded-lg min-h-[40px] whitespace-pre-wrap">
+                {lastTranscript || 'Waiting for voice input...'}
+              </pre>
+            </CollapsibleSection>
+
+            {/* Agent Trace */}
+            <CollapsibleSection
+              title="Agent Reasoning"
+              icon={<Brain className="w-3.5 h-3.5" />}
+              open={showTrace}
+              onToggle={() => setShowTrace(!showTrace)}
+            >
+              <pre className="text-[11px] font-mono bg-muted p-3 rounded-lg overflow-auto max-h-[200px] whitespace-pre-wrap">
                 {agentTrace || 'No agent activity yet'}
               </pre>
-            </CardContent>
-          </Card>
+            </CollapsibleSection>
+          </div>
         </aside>
       </div>
+    </div>
+  )
+}
+
+// ==============================
+// Helper Components
+// ==============================
+
+function CollapsibleSection({
+  title,
+  icon,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string
+  icon: React.ReactNode
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors py-1"
+      >
+        <span className="flex items-center gap-1.5">{icon}{title}</span>
+        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

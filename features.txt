@@ -1,0 +1,8 @@
+- Hands-Free Voice & Text Control
+- Dual-Layer AI Routing (Instant Pattern Matcher + Groq Llama 3)
+- Natural Language Game Setup via Gemini
+- Animated Framer Motion Leaderboards
+- Smart Visual Team Statuses (e.g., Frozen, Eliminated)
+- Instant Snapshot-Based Undo/Redo
+- Live Countdown Timers & Broadcast Overlays
+- Real-Time AI Audio Commentary & Post-Game Summaries

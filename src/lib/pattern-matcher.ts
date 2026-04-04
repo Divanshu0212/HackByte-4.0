@@ -21,6 +21,27 @@ function normalizeText(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ')
 }
 
+/** Fuzzy team name matching with Levenshtein distance */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = []
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i]
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        )
+      }
+    }
+  }
+  return matrix[b.length][a.length]
+}
+
 function resolveTeamId(state: LiveState, input: string): Team | null {
   const normalized = normalizeText(input)
 
@@ -32,7 +53,7 @@ function resolveTeamId(state: LiveState, input: string): Team | null {
   const byName = state.teams.find(t => normalizeText(t.name) === normalized)
   if (byName) return byName
 
-  // Try partial name match
+  // Try partial name match (contains)
   const byPartial = state.teams.find(t =>
     normalizeText(t.name).includes(normalized) ||
     normalized.includes(normalizeText(t.name))
@@ -43,12 +64,35 @@ function resolveTeamId(state: LiveState, input: string): Team | null {
   const teamNumMatch = normalized.match(/team\s*(\d+)/)
   if (teamNumMatch) {
     const num = parseInt(teamNumMatch[1], 10)
+    // Try exact match first
     const byNumber = state.teams.find(t =>
-      t.name.toLowerCase().includes(`team ${num}`) ||
-      t.name.toLowerCase() === `team ${num}`
+      normalizeText(t.name) === `team ${num}`
     )
     if (byNumber) return byNumber
+    // Try contains
+    const byNumContain = state.teams.find(t =>
+      normalizeText(t.name).includes(`team ${num}`)
+    )
+    if (byNumContain) return byNumContain
+    // Try by index (1-based)
+    if (num > 0 && num <= state.teams.length) {
+      return state.teams[num - 1]
+    }
   }
+
+  // Fuzzy match — allow up to 2 character difference for short names, 3 for longer
+  let bestMatch: Team | null = null
+  let bestDistance = Infinity
+  for (const team of state.teams) {
+    const teamNorm = normalizeText(team.name)
+    const distance = levenshteinDistance(normalized, teamNorm)
+    const threshold = teamNorm.length <= 6 ? 2 : 3
+    if (distance < bestDistance && distance <= threshold) {
+      bestDistance = distance
+      bestMatch = team
+    }
+  }
+  if (bestMatch) return bestMatch
 
   return null
 }
@@ -60,16 +104,14 @@ function resolveTeamId(state: LiveState, input: string): Team | null {
 export function matchPattern(transcript: string, state: LiveState): PatternResult {
   const text = normalizeText(transcript)
 
-  console.log('[Pattern Matcher] Trying to match:', text)
-
   // ===== ADD TEAMS =====
+  // "add 5 teams" / "create 3 teams" / "add teams alpha beta gamma"
   const addTeamsMatch = text.match(
     /^(?:add|create|make)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+(?:teams?|participants?|players?|groups?)$/
   )
   if (addTeamsMatch) {
     const count = parseNumber(addTeamsMatch[1])
     if (count && count > 0 && count <= 100) {
-      console.log('[Pattern Matcher] ✓ Matched ADD TEAMS:', count)
       const teams = Array.from({ length: count }, (_, i) => ({
         name: `Team ${state.teams.length + i + 1}`,
         score: 0,
@@ -82,12 +124,29 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
     }
   }
 
+  // "add teams alpha, beta, gamma"
+  const addNamedTeamsMatch = text.match(
+    /^(?:add|create)\s+teams?\s+(.+)$/
+  )
+  if (addNamedTeamsMatch) {
+    const names = addNamedTeamsMatch[1]
+      .split(/[,;\sand]+/)
+      .map(n => n.trim())
+      .filter(n => n.length > 0 && !['and', 'or'].includes(n.toLowerCase()))
+    if (names.length > 0) {
+      return {
+        matched: true,
+        actions: [{ action: 'add_participants', teams: names.map(name => ({ name, score: 0 })) }],
+        commentary: `Adding ${names.length} teams: ${names.join(', ')}!`,
+      }
+    }
+  }
+
   // ===== TEAM CORRECT/WRONG =====
   const correctMatch = text.match(/^(?:team\s+)?(.+?)\s+(?:is\s+)?(?:correct|right|got it|wins?|scored?)$/i)
   if (correctMatch) {
     const team = resolveTeamId(state, correctMatch[1])
     if (team) {
-      console.log('[Pattern Matcher] ✓ Matched CORRECT for', team.name)
       return {
         matched: true,
         actions: [{ action: 'update_score', id: team.id, delta: 10, reason: 'Correct answer' }],
@@ -100,7 +159,6 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
   if (wrongMatch) {
     const team = resolveTeamId(state, wrongMatch[1])
     if (team) {
-      console.log('[Pattern Matcher] ✓ Matched WRONG for', team.name)
       return {
         matched: true,
         actions: [{ action: 'update_score', id: team.id, delta: -5, reason: 'Wrong answer' }],
@@ -116,7 +174,6 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
     const team = resolveTeamId(state, plusMatch[1])
     const points = parseNumber(plusMatch[2])
     if (team && points !== null) {
-      console.log('[Pattern Matcher] ✓ Matched PLUS for', team.name, '+', points)
       return {
         matched: true,
         actions: [{ action: 'update_score', id: team.id, delta: points }],
@@ -130,7 +187,6 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
     const team = resolveTeamId(state, minusMatch[1])
     const points = parseNumber(minusMatch[2])
     if (team && points !== null) {
-      console.log('[Pattern Matcher] ✓ Matched MINUS for', team.name, '-', points)
       return {
         matched: true,
         actions: [{ action: 'update_score', id: team.id, delta: -points }],
@@ -145,11 +201,24 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
     const points = parseNumber(addToMatch[1])
     const team = resolveTeamId(state, addToMatch[2])
     if (team && points !== null) {
-      console.log('[Pattern Matcher] ✓ Matched ADD TO for', team.name, '+', points)
       return {
         matched: true,
         actions: [{ action: 'update_score', id: team.id, delta: points }],
         commentary: `${team.name} scores ${points} points!`,
+      }
+    }
+  }
+
+  // "subtract/deduct N points from team X"
+  const subtractFromMatch = text.match(/^(?:subtract|deduct|remove)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:points?\s+)?(?:from\s+)?(?:team\s+)?(.+)$/i)
+  if (subtractFromMatch) {
+    const points = parseNumber(subtractFromMatch[1])
+    const team = resolveTeamId(state, subtractFromMatch[2])
+    if (team && points !== null) {
+      return {
+        matched: true,
+        actions: [{ action: 'update_score', id: team.id, delta: -points }],
+        commentary: `${team.name} loses ${points} points.`,
       }
     }
   }
@@ -226,7 +295,7 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
       return {
         matched: true,
         actions: [{ action: 'freeze_team', id: team.id }],
-        commentary: `${team.name} is now frozen!`,
+        commentary: `${team.name} is now frozen! ❄️`,
       }
     }
   }
@@ -238,7 +307,7 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
       return {
         matched: true,
         actions: [{ action: 'thaw_team', id: team.id }],
-        commentary: `${team.name} is back in action!`,
+        commentary: `${team.name} is back in action! 🔥`,
       }
     }
   }
@@ -268,8 +337,60 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
     }
   }
 
+  // ===== REVIVE =====
+  const reviveMatch = text.match(/^(?:revive|restore|bring back)\s+(?:team\s+)?(.+)$/i)
+  if (reviveMatch) {
+    const team = resolveTeamId(state, reviveMatch[1])
+    if (team) {
+      return {
+        matched: true,
+        actions: [{ action: 'revive_team', id: team.id }],
+        commentary: `${team.name} is back in the game!`,
+      }
+    }
+  }
+
+  // ===== RENAME =====
+  const renameMatch = text.match(/^rename\s+(?:team\s+)?(.+?)\s+to\s+(.+)$/i)
+  if (renameMatch) {
+    const team = resolveTeamId(state, renameMatch[1])
+    const newName = renameMatch[2].trim()
+    if (team && newName) {
+      return {
+        matched: true,
+        actions: [{ action: 'rename_team', id: team.id, new_name: newName }],
+        commentary: `${team.name} is now ${newName}!`,
+      }
+    }
+  }
+
+  // ===== ANNOUNCE =====
+  const announceMatch = text.match(/^announce\s+(.+)$/i)
+  if (announceMatch) {
+    const message = announceMatch[1].trim()
+    return {
+      matched: true,
+      actions: [{ action: 'create_announcement', message, voice: true }],
+      commentary: message,
+    }
+  }
+
+  // ===== CHECKPOINT (Scenario 2) =====
+  const checkpointMatch = text.match(/^(.+?)\s+(?:reached|arrived at|completed)\s+(?:checkpoint|station|point)\s+(\d+)$/i)
+  if (checkpointMatch) {
+    const team = resolveTeamId(state, checkpointMatch[1])
+    const checkpoint = parseInt(checkpointMatch[2], 10)
+    if (team) {
+      return {
+        matched: true,
+        actions: [{ action: 'record_checkpoint', team_id: team.id, checkpoint }],
+        commentary: `${team.name} has reached checkpoint ${checkpoint}!`,
+      }
+    }
+  }
+
   // ===== UNDO/REDO =====
-  if (/^(?:undo|undo\s+last|go\s+back)$/i.test(text)) {
+  if (/^(?:undo|undo\s+last|go\s+back|undo\s+last\s+action)$/i.test(text)) {
     return {
       matched: true,
       actions: [{ action: 'undo' }],
@@ -286,6 +407,5 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
   }
 
   // ===== NO MATCH =====
-  console.log('[Pattern Matcher] ✗ No match found, falling back to Gemini agent')
   return { matched: false }
 }

@@ -31,6 +31,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.0",
+    "groq-sdk": "^1.1.2",
     "howler": "^2.2.0",
     "lucide-react": "^0.460.0",
     "mongodb": "^6.0.0",

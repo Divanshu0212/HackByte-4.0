@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 import type { LiveState, AgentResponse, RuleManifest } from '@/types'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '')
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY || ''
+})
+
+const PRIMARY_GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+const FALLBACK_GROQ_MODEL = 'llama-3.1-8b-instant'
 
 function buildSystemPrompt(
   liveState: LiveState,
@@ -14,11 +19,9 @@ function buildSystemPrompt(
 ## CURRENT LIVE STATE
 ${JSON.stringify(liveState, null, 2)}
 
-${ruleManifest ? `## COMPILED RULE MANIFEST
-${JSON.stringify(ruleManifest, null, 2)}` : '## SCORING MODE: Linear (no rule manifest)'}
+${ruleManifest ? `## COMPILED RULE MANIFEST\n${JSON.stringify(ruleManifest, null, 2)}` : '## SCORING MODE: Linear (no rule manifest)'}
 
-${conversationHistory.length > 0 ? `## CONVERSATION HISTORY
-${conversationHistory.slice(-5).join('\n')}` : ''}
+${conversationHistory.length > 0 ? `## CONVERSATION HISTORY\n${conversationHistory.slice(-5).join('\n')}` : ''}
 
 ## YOUR TASK
 1. Interpret the operator's voice command
@@ -39,8 +42,7 @@ ${conversationHistory.slice(-5).join('\n')}` : ''}
     "confirmation_title": "Short title",
     "changes": ["What will change"],
     "untouched": ["What stays the same"],
-    "effective_from": "now | end_of_round | specific_time",
-    "action": { "reducer": "reducer_name", "params": {} }
+    "effective_from": "now"
   }
 }
 
@@ -60,21 +62,15 @@ Each action in the "actions" array must be one of:
 - {"action": "eliminate_team", "id": "team_id"}
 - {"action": "disqualify_team", "id": "team_id"}
 - {"action": "revive_team", "id": "team_id"}
-- {"action": "apply_rule_mutation", "target_id": "id", "field": "...", "operation": "increment|decrement|set|toggle", "value": ...}
 - {"action": "set_team_field", "id": "team_id", "field": "...", "value": ...}
-- {"action": "set_global_field", "field": "...", "value": ...}
 - {"action": "undo"}
 - {"action": "redo"}
-- {"action": "manual_correction", "team_id": "id", "new_score": number, "reason": "..."}
 
 ## RULES
 1. ALWAYS use team IDs from the current state, not display names
 2. Score changes go forward only - never modify past data without explicit correction
 3. For complex changes, include a "proposal" object for confirmation
-4. Include commentary for significant changes
-5. Output ONLY valid JSON - no markdown, no explanation
-
-IMPORTANT: Never return an empty actions array if the operator asked to change something. If unsure, ask for clarification in the commentary.`
+4. Output ONLY valid JSON - no markdown, no explanation`
 
   return basePrompt
 }
@@ -90,13 +86,12 @@ export async function POST(request: Request) {
       )
     }
 
-    const model = genAI.getGenerativeModel({
-      model: 'models/gemini-2.5-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-      },
-    })
+    if (!process.env.GROQ_API_KEY) {
+       return NextResponse.json(
+        { success: false, error: 'GROQ_API_KEY environment variable is not set.' },
+        { status: 500 }
+      )
+    }
 
     const systemPrompt = buildSystemPrompt(
       liveState,
@@ -104,12 +99,37 @@ export async function POST(request: Request) {
       conversationHistory || []
     )
 
-    const result = await model.generateContent([
-      { text: systemPrompt },
-      { text: `Operator voice command: "${command}"\n\nReturn JSON response:` },
-    ])
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
+      { role: 'user' as const, content: `Operator voice command: "${command}"\n\nReturn JSON response:` }
+    ]
 
-    const responseText = result.response.text()
+    let chatCompletion
+
+    try {
+      chatCompletion = await groq.chat.completions.create({
+        messages,
+        model: PRIMARY_GROQ_MODEL,
+        temperature: 0.2,
+        response_format: { type: 'json_object' }
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const isModelError = /model_decommissioned|decommissioned|not supported/i.test(errorMessage)
+
+      if (!isModelError || PRIMARY_GROQ_MODEL === FALLBACK_GROQ_MODEL) {
+        throw error
+      }
+
+      chatCompletion = await groq.chat.completions.create({
+        messages,
+        model: FALLBACK_GROQ_MODEL,
+        temperature: 0.2,
+        response_format: { type: 'json_object' }
+      })
+    }
+
+    const responseText = chatCompletion.choices[0]?.message?.content || '{}'
     let response: AgentResponse
 
     try {

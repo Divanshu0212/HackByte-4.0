@@ -69,8 +69,8 @@
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -99,17 +99,6 @@ body.elixa-speaking .header-brand {
   to {
     transform: translateX(0);
     opacity: 1;
-  }
-}
-
-@keyframes slide-out-left {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(-100%);
-    opacity: 0;
   }
 }
 
@@ -142,41 +131,12 @@ body.elixa-speaking .header-brand {
   }
 }
 
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease-out;
-}
-
-.animate-slide-out-left {
-  animation: slide-out-left 0.3s ease-out;
-}
-
 .animate-bounce-in {
   animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .animate-score-pop {
   animation: score-pop 0.3s ease-out;
-}
-
-/* Team card status variants */
-.team-card-active {
-  @apply border-border;
-}
-
-.team-card-frozen {
-  @apply border-blue-300 bg-blue-50/50 dark:bg-blue-950/10;
-}
-
-.team-card-defeated {
-  @apply border-destructive/30 opacity-60 grayscale;
-}
-
-.team-card-shielded {
-  @apply border-blue-400 ring-2 ring-blue-200/50;
-}
-
-.team-card-cursed {
-  @apply border-purple-400 ring-2 ring-purple-200/50;
 }
 
 /* Rank badge variants */
@@ -194,11 +154,11 @@ body.elixa-speaking .header-brand {
 
 /* Score delta animations */
 .score-delta-positive {
-  @apply text-success bg-success/10 animate-bounce-in;
+  @apply text-emerald-700 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-950/30 animate-bounce-in;
 }
 
 .score-delta-negative {
-  @apply text-destructive bg-destructive/10 animate-bounce-in;
+  @apply text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-950/30 animate-bounce-in;
 }
 
 /* Confirmation card */
@@ -223,4 +183,18 @@ body.elixa-speaking .header-brand {
 .voice-indicator::after {
   content: '';
   @apply absolute inset-0 rounded-full bg-primary/20 animate-ping;
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+  main {
+    padding: 0.75rem !important;
+  }
+}
+
+/* Small custom breakpoint */
+@media (min-width: 480px) {
+  .xs\:inline {
+    display: inline !important;
+  }
 }
