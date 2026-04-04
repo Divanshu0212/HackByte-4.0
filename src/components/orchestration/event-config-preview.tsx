@@ -68,7 +68,7 @@ export function EventConfigPreview({ configJson }: EventConfigPreviewProps) {
   )
 
   return (
-    <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+    <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
       <CardHeader className="border-b border-white/10 pb-4">
         <CardTitle className="flex items-center justify-between">
           <span className="text-xl text-white">{config.name}</span>
@@ -78,19 +78,19 @@ export function EventConfigPreview({ configJson }: EventConfigPreviewProps) {
         {/* Summary Stats */}
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="flex items-center gap-2 text-sm text-slate-300">
-            <Calendar className="h-4 w-4 text-cyan-400" />
+            <Calendar className="h-4 w-4 text-violet-400" />
             <span>{new Date(config.date).toLocaleDateString()}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
-            <MapPin className="h-4 w-4 text-cyan-400" />
+            <MapPin className="h-4 w-4 text-violet-400" />
             <span>{config.venue || 'TBD'}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
-            <Users className="h-4 w-4 text-cyan-400" />
+            <Users className="h-4 w-4 text-violet-400" />
             <span>{config.participant_count} participants</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
-            <CheckCircle2 className="h-4 w-4 text-cyan-400" />
+            <CheckCircle2 className="h-4 w-4 text-violet-400" />
             <span>{totalTasks} tasks</span>
           </div>
         </div>
@@ -109,7 +109,7 @@ export function EventConfigPreview({ configJson }: EventConfigPreviewProps) {
                 setExpandedPhases(new Set(config.phases.map((p) => p.id)))
               }
             }}
-            className="text-cyan-300 hover:text-cyan-200"
+            className="text-purple-300 hover:text-purple-200"
           >
             {expandedPhases.size === config.phases.length ? 'Collapse All' : 'Expand All'}
           </button>
@@ -133,7 +133,7 @@ export function EventConfigPreview({ configJson }: EventConfigPreviewProps) {
                   className="flex w-full items-center justify-between p-3 text-left transition hover:bg-white/5"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500/30 to-teal-500/30 text-xs font-bold text-cyan-200">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/30 to-purple-500/30 text-xs font-bold text-purple-200">
                       {PHASE_ORDER.indexOf(phaseId as OrchestrationPhaseId) + 1}
                     </div>
                     <div>

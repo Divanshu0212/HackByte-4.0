@@ -288,14 +288,14 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <main
-        className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center"
+        className="min-h-screen bg-[#06040d] text-slate-100 flex items-center justify-center"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 20% 10%, rgba(45,212,191,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.2), transparent 30%), linear-gradient(120deg, #020617 0%, #0f172a 45%, #082f49 100%)',
+            'radial-gradient(circle at 20% 10%, rgba(124,58,237,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.2), transparent 30%), linear-gradient(120deg, #06040d 0%, #0c0818 45%, #1a1528 100%)',
         }}
       >
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-cyan-400 mx-auto mb-4" />
+          <Loader2 className="h-8 w-8 animate-spin text-violet-400 mx-auto mb-4" />
           <p className="text-slate-400">Loading event...</p>
         </div>
       </main>
@@ -305,10 +305,10 @@ export default function DashboardPage() {
   if (!event) {
     return (
       <main
-        className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center"
+        className="min-h-screen bg-[#06040d] text-slate-100 flex items-center justify-center"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 20% 10%, rgba(45,212,191,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.2), transparent 30%), linear-gradient(120deg, #020617 0%, #0f172a 45%, #082f49 100%)',
+            'radial-gradient(circle at 20% 10%, rgba(124,58,237,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.2), transparent 30%), linear-gradient(120deg, #06040d 0%, #0c0818 45%, #1a1528 100%)',
         }}
       >
         <div className="text-center">
@@ -323,10 +323,10 @@ export default function DashboardPage() {
 
   return (
     <main
-      className="min-h-screen bg-slate-950 text-slate-100"
+      className="min-h-screen bg-[#06040d] text-slate-100"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 20% 10%, rgba(45,212,191,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.2), transparent 30%), linear-gradient(120deg, #020617 0%, #0f172a 45%, #082f49 100%)',
+          'radial-gradient(circle at 20% 10%, rgba(124,58,237,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.2), transparent 30%), linear-gradient(120deg, #06040d 0%, #0c0818 45%, #1a1528 100%)',
       }}
     >
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-10 sm:px-10">
@@ -336,7 +336,7 @@ export default function DashboardPage() {
             <div>
               <Link
                 href="/event-orchestration"
-                className="mb-2 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-cyan-300"
+                className="mb-2 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-purple-300"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Command Deck
@@ -345,19 +345,19 @@ export default function DashboardPage() {
               <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-400">
                 {event.date && (
                   <span className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4 text-cyan-400" />
+                    <Calendar className="h-4 w-4 text-violet-400" />
                     {new Date(event.date).toLocaleDateString()}
                   </span>
                 )}
                 {event.venue && (
                   <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4 text-cyan-400" />
+                    <MapPin className="h-4 w-4 text-violet-400" />
                     {event.venue}
                   </span>
                 )}
                 {event.participant_count > 0 && (
                   <span className="flex items-center gap-1">
-                    <Users className="h-4 w-4 text-cyan-400" />
+                    <Users className="h-4 w-4 text-violet-400" />
                     {event.participant_count} participants
                   </span>
                 )}
@@ -366,7 +366,7 @@ export default function DashboardPage() {
                   className={
                     event.status === 'completed'
                       ? 'border-emerald-500/30 text-emerald-300'
-                      : 'border-cyan-500/30 text-cyan-300'
+                      : 'border-violet-500/30 text-violet-300'
                   }
                 >
                   {event.status}
@@ -461,7 +461,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Quick Stats */}
-            <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+            <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-slate-400 uppercase tracking-wide">
                   Task Status
@@ -469,7 +469,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {[
-                  { label: 'Available', count: event.tasks.filter((t) => t.status === 'available').length, color: 'text-cyan-400' },
+                  { label: 'Available', count: event.tasks.filter((t) => t.status === 'available').length, color: 'text-violet-400' },
                   { label: 'Completed', count: event.tasks.filter((t) => t.status === 'completed').length, color: 'text-emerald-400' },
                   { label: 'Blocked', count: event.tasks.filter((t) => t.status === 'blocked').length, color: 'text-red-400' },
                   { label: 'Locked', count: event.tasks.filter((t) => t.status === 'locked').length, color: 'text-slate-400' },
@@ -483,7 +483,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Checkpoints */}
-            <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+            <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm text-slate-400 uppercase tracking-wide">
                   Checkpoints
@@ -497,7 +497,7 @@ export default function DashboardPage() {
                       cp.status === 'passed'
                         ? 'bg-emerald-500/10'
                         : cp.status === 'available'
-                        ? 'bg-cyan-500/10'
+                        ? 'bg-violet-500/10'
                         : 'bg-white/5'
                     }`}
                   >
@@ -508,7 +508,7 @@ export default function DashboardPage() {
                         cp.status === 'passed'
                           ? 'border-emerald-500/30 text-emerald-300'
                           : cp.status === 'available'
-                          ? 'border-cyan-500/30 text-cyan-300'
+                          ? 'border-violet-500/30 text-violet-300'
                           : 'border-white/20 text-slate-400'
                       }
                     >

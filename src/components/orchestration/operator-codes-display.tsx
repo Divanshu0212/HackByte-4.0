@@ -33,7 +33,7 @@ const roleIcons: Record<OrchestrationOperatorRole, React.ComponentType<{ classNa
 
 const roleColors: Record<OrchestrationOperatorRole, string> = {
   director: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  venue_lead: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  venue_lead: 'bg-violet-500/20 text-purple-300 border-violet-500/30',
   sponsor_lead: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   tech_lead: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   volunteer_coord: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
@@ -73,7 +73,7 @@ export function OperatorCodesDisplay({
   }
 
   return (
-    <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+    <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
       <CardHeader className="border-b border-white/10 pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg text-white">Operator Access Codes</CardTitle>
@@ -147,7 +147,7 @@ export function OperatorCodesDisplay({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Event ID</p>
-              <code className="text-sm font-mono text-cyan-300">{eventId}</code>
+              <code className="text-sm font-mono text-purple-300">{eventId}</code>
             </div>
             <Button
               size="sm"

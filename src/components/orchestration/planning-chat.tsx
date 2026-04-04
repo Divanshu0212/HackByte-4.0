@@ -67,13 +67,13 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
   ]
 
   return (
-    <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+    <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
       <CardContent className="p-6">
         {/* Messages Area */}
         <div className="mb-4 max-h-[400px] min-h-[200px] overflow-y-auto rounded-lg border border-white/10 bg-black/30 p-4">
           {messages.length === 0 ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-cyan-200">
+              <div className="flex items-center gap-2 text-purple-200">
                 <Sparkles className="h-4 w-4" />
                 <span className="text-sm font-medium">Describe your event</span>
               </div>
@@ -87,7 +87,7 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
                   <button
                     key={i}
                     onClick={() => setInputValue(prompt)}
-                    className="block w-full rounded-lg border border-white/10 bg-white/5 p-3 text-left text-sm text-slate-300 transition hover:border-cyan-300/30 hover:bg-white/10"
+                    className="block w-full rounded-lg border border-white/10 bg-white/5 p-3 text-left text-sm text-slate-300 transition hover:border-violet-400/30 hover:bg-white/10"
                   >
                     &ldquo;{prompt}&rdquo;
                   </button>
@@ -107,12 +107,12 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
                     <div
                       className={`max-w-[85%] rounded-lg px-4 py-2 ${
                         message.role === 'user'
-                          ? 'bg-cyan-500/20 text-cyan-100'
+                          ? 'bg-violet-500/20 text-purple-100'
                           : 'bg-white/10 text-slate-200'
                       }`}
                     >
                       {message.role === 'assistant' && (
-                        <div className="mb-1 flex items-center gap-1 text-xs text-cyan-300">
+                        <div className="mb-1 flex items-center gap-1 text-xs text-purple-300">
                           <Sparkles className="h-3 w-3" />
                           Elixa
                         </div>
@@ -134,7 +134,7 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 text-cyan-300"
+                  className="flex items-center gap-2 text-purple-300"
                 >
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="text-sm">Generating event structure...</span>
@@ -162,13 +162,13 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
             onKeyDown={handleKeyDown}
             placeholder="Describe your event..."
             rows={2}
-            className="flex-1 resize-none rounded-lg border border-white/15 bg-black/30 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-300/50 focus:outline-none focus:ring-1 focus:ring-cyan-300/50"
+            className="flex-1 resize-none rounded-lg border border-white/15 bg-black/30 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-violet-400/50 focus:outline-none focus:ring-1 focus:ring-violet-400/50"
             disabled={isLoading}
           />
           <Button
             type="submit"
             disabled={!inputValue.trim() || isLoading}
-            className="self-end bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-600 hover:to-teal-600"
+            className="self-end bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

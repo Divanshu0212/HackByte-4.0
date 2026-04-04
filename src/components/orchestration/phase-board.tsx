@@ -45,7 +45,7 @@ const phaseIcons: Record<OrchestrationPhaseId, React.ComponentType<{ className?:
 
 const checkpointStatusColors: Record<OrchestrationCheckpointStatus, string> = {
   locked: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-  available: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  available: 'bg-violet-500/20 text-purple-300 border-violet-500/30',
   passed: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   failed: 'bg-red-500/20 text-red-300 border-red-500/30',
 }
@@ -84,8 +84,8 @@ export function PhaseBoard({
               onClick={() => setSelectedPhase(isSelected ? null : phaseId)}
               className={`flex-shrink-0 w-[180px] rounded-xl border p-4 text-left transition ${
                 isSelected
-                  ? 'border-cyan-400/50 bg-cyan-500/10 shadow-lg shadow-cyan-500/10'
-                  : 'border-white/15 bg-slate-900/60 hover:border-white/25 hover:bg-slate-900/80'
+                  ? 'border-violet-400/50 bg-violet-500/10 shadow-lg shadow-violet-500/10'
+                  : 'border-white/15 bg-[#1a1528]/60 hover:border-white/25 hover:bg-[#1a1528]/80'
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -95,13 +95,13 @@ export function PhaseBoard({
                   className={`flex h-10 w-10 items-center justify-center rounded-lg ${
                     stats.checkpoint?.status === 'passed'
                       ? 'bg-emerald-500/20'
-                      : 'bg-gradient-to-br from-cyan-500/30 to-teal-500/30'
+                      : 'bg-gradient-to-br from-violet-500/30 to-purple-500/30'
                   }`}
                 >
                   {stats.checkpoint?.status === 'passed' ? (
                     <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                   ) : (
-                    <Icon className="h-5 w-5 text-cyan-300" />
+                    <Icon className="h-5 w-5 text-purple-300" />
                   )}
                 </div>
                 <span className="text-xs text-slate-500">{index + 1}/6</span>
@@ -158,13 +158,13 @@ export function PhaseBoard({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+            <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg text-white flex items-center gap-2">
                     {(() => {
                       const Icon = phaseIcons[selectedPhase]
-                      return <Icon className="h-5 w-5 text-cyan-400" />
+                      return <Icon className="h-5 w-5 text-violet-400" />
                     })()}
                     {PHASE_LABELS[selectedPhase]}
                   </CardTitle>
@@ -176,7 +176,7 @@ export function PhaseBoard({
                       return (
                         <Button
                           onClick={() => onPassCheckpoint?.(selectedPhase)}
-                          className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600"
+                          className="bg-gradient-to-r from-emerald-500 to-purple-500 text-white hover:from-emerald-600 hover:to-purple-600"
                           size="sm"
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -219,7 +219,7 @@ export function PhaseBoard({
                               ? 'bg-red-400'
                               : task.status === 'locked'
                               ? 'bg-slate-500'
-                              : 'bg-cyan-400'
+                              : 'bg-violet-400'
                           }`}
                         />
                         <div className="flex-1 min-w-0">

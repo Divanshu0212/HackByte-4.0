@@ -38,9 +38,9 @@ const statusConfig: Record<
     icon: Lock,
   },
   available: {
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/30',
-    text: 'text-cyan-300',
+    bg: 'bg-violet-500/10',
+    border: 'border-violet-500/30',
+    text: 'text-purple-300',
     icon: Clock,
   },
   in_progress: {
@@ -149,7 +149,7 @@ export function TaskCard({
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
             {showPhase && (
               <span className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
                 {PHASE_LABELS[task.phase]}
               </span>
             )}
@@ -195,14 +195,14 @@ export function TaskCard({
                 onChange={(e) => setNoteText(e.target.value)}
                 placeholder="Add a note..."
                 rows={2}
-                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-300/50 focus:outline-none"
+                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-violet-400/50 focus:outline-none"
               />
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   onClick={handleSaveNote}
                   disabled={isLoading}
-                  className="bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30"
+                  className="bg-violet-500/20 text-purple-300 hover:bg-violet-500/30"
                 >
                   {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Note'}
                 </Button>
@@ -257,7 +257,7 @@ export function TaskCard({
                   size="sm"
                   onClick={handleComplete}
                   disabled={isLoading}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600"
+                  className="bg-gradient-to-r from-emerald-500 to-purple-500 text-white hover:from-emerald-600 hover:to-purple-600"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

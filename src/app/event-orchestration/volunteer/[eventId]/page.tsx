@@ -274,10 +274,10 @@ export default function VolunteerPage() {
 
   return (
     <main
-      className="min-h-screen bg-slate-950 text-slate-100"
+      className="min-h-screen bg-[#06040d] text-slate-100"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 20% 10%, rgba(45,212,191,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.2), transparent 30%), linear-gradient(120deg, #020617 0%, #0f172a 45%, #082f49 100%)',
+          'radial-gradient(circle at 20% 10%, rgba(124,58,237,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.2), transparent 30%), linear-gradient(120deg, #06040d 0%, #0c0818 45%, #1a1528 100%)',
       }}
     >
       <div className="mx-auto max-w-2xl px-6 pb-20 pt-10 sm:px-10">
@@ -285,7 +285,7 @@ export default function VolunteerPage() {
         <header className="mb-8">
           <Link
             href="/event-orchestration"
-            className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-cyan-300"
+            className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-purple-300"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -293,7 +293,7 @@ export default function VolunteerPage() {
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-cyan-200">ELIXA</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-purple-200">ELIXA</p>
               <h1 className="text-2xl font-bold text-white">
                 {event?.name || 'Volunteer Portal'}
               </h1>
@@ -318,10 +318,10 @@ export default function VolunteerPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+            <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
               <CardHeader className="text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500/30 to-teal-500/30">
-                  <LogIn className="h-8 w-8 text-cyan-300" />
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-purple-500/30">
+                  <LogIn className="h-8 w-8 text-purple-300" />
                 </div>
                 <CardTitle className="text-xl text-white">Enter Access Code</CardTitle>
                 <CardDescription className="text-slate-400">
@@ -335,14 +335,14 @@ export default function VolunteerPage() {
                     value={accessCode}
                     onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
                     placeholder="e.g., OP-VEN-4A2B"
-                    className="w-full rounded-lg border border-white/15 bg-black/30 px-4 py-3 text-center font-mono text-lg tracking-wider text-slate-100 placeholder:text-slate-500 focus:border-cyan-300/50 focus:outline-none focus:ring-1 focus:ring-cyan-300/50"
+                    className="w-full rounded-lg border border-white/15 bg-black/30 px-4 py-3 text-center font-mono text-lg tracking-wider text-slate-100 placeholder:text-slate-500 focus:border-violet-400/50 focus:outline-none focus:ring-1 focus:ring-violet-400/50"
                     maxLength={15}
                     autoFocus
                   />
                   <Button
                     type="submit"
                     disabled={!accessCode.trim() || isAuthenticating}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-600 hover:to-teal-600"
+                    className="w-full bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600"
                   >
                     {isAuthenticating ? (
                       <>
@@ -364,12 +364,12 @@ export default function VolunteerPage() {
           /* Authenticated View */
           <div className="space-y-6">
             {/* Role & Progress Card */}
-            <Card className="border-white/15 bg-slate-900/60 backdrop-blur-md">
+            <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500/30 to-teal-500/30">
-                      <User className="h-6 w-6 text-cyan-300" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-purple-500/30">
+                      <User className="h-6 w-6 text-purple-300" />
                     </div>
                     <div>
                       <p className="font-medium text-white">{session.label}</p>
@@ -417,7 +417,7 @@ export default function VolunteerPage() {
             {/* Available Tasks */}
             {availableTasks.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm uppercase tracking-wide text-cyan-300">
+                <h2 className="text-sm uppercase tracking-wide text-purple-300">
                   Available Tasks ({availableTasks.length})
                 </h2>
                 <AnimatePresence>

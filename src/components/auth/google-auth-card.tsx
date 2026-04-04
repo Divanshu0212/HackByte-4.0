@@ -174,7 +174,7 @@ export function GoogleAuthCard({ targetRoute }: GoogleAuthCardProps) {
         </label>
 
         <Button
-          className="w-full gap-2 bg-cyan-300 text-slate-950 hover:bg-cyan-200"
+          className="w-full gap-2 bg-violet-500 text-white hover:bg-violet-400"
           disabled={!user || submitting}
           onClick={handleContinue}
           type="button"

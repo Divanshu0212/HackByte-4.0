@@ -125,7 +125,7 @@ export function TeamCard({ team, rank }: TeamCardProps) {
   const statusConfig: Record<string, { label: string; className: string }> = {
     active: { label: 'Active', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' },
     frozen: { label: 'Frozen', className: 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400' },
-    shielded: { label: 'Shielded', className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-400' },
+    shielded: { label: 'Shielded', className: 'bg-violet-100 text-violet-700 dark:bg-violet-950/30 dark:text-violet-400' },
     cursed: { label: 'Cursed', className: 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400' },
     disqualified: { label: 'DQ\'d', className: 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400' },
     eliminated: { label: 'Out', className: 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400' },

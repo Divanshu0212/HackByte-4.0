@@ -219,7 +219,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
             <Button
               size="sm"
               onClick={startAdding}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white"
+              className="bg-violet-600 hover:bg-violet-500 text-white"
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Task
@@ -247,7 +247,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="Task title *"
-                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-300/50 focus:outline-none"
+                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-violet-400/50 focus:outline-none"
               />
 
               {/* Description */}
@@ -256,7 +256,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Description"
                 rows={2}
-                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-300/50 focus:outline-none resize-none"
+                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-violet-400/50 focus:outline-none resize-none"
               />
 
               {/* Phase + Role Row */}
@@ -264,7 +264,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                 <select
                   value={form.phase}
                   onChange={(e) => setForm({ ...form, phase: e.target.value as OrchestrationPhaseId })}
-                  className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:border-cyan-300/50 focus:outline-none"
+                  className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:border-violet-400/50 focus:outline-none"
                 >
                   {PHASES.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -276,7 +276,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                 <select
                   value={form.assigned_role}
                   onChange={(e) => setForm({ ...form, assigned_role: e.target.value as OrchestrationOperatorRole })}
-                  className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:border-cyan-300/50 focus:outline-none"
+                  className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:border-violet-400/50 focus:outline-none"
                 >
                   {ROLES.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -290,7 +290,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value as any })}
-                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:border-cyan-300/50 focus:outline-none"
+                className="w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-slate-100 focus:border-violet-400/50 focus:outline-none"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
@@ -302,7 +302,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
               {/* Dependencies Toggle */}
               <button
                 onClick={() => setShowDependencies(!showDependencies)}
-                className="flex items-center gap-2 text-sm text-cyan-300 hover:text-cyan-200"
+                className="flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200"
               >
                 <LinkIcon className="h-4 w-4" />
                 Dependencies ({form.depends_on.length} selected)
@@ -341,7 +341,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                   size="sm"
                   onClick={editingTask ? handleEditTask : handleAddTask}
                   disabled={isLoading}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white flex-1"
+                  className="bg-violet-600 hover:bg-violet-500 text-white flex-1"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -376,7 +376,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                 key={task.task_id}
                 className={`group flex items-center gap-2 rounded-lg p-2 text-sm transition ${
                   editingTask?.task_id === task.task_id
-                    ? 'bg-cyan-500/20 border border-cyan-500/30'
+                    ? 'bg-violet-500/20 border border-violet-500/30'
                     : 'bg-white/5 hover:bg-white/10'
                 }`}
               >
@@ -391,7 +391,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                           : task.status === 'blocked'
                           ? 'border-red-500/30 text-red-300'
                           : task.status === 'available'
-                          ? 'border-cyan-500/30 text-cyan-300'
+                          ? 'border-violet-500/30 text-purple-300'
                           : 'border-white/20 text-slate-400'
                       }`}
                     >
@@ -410,7 +410,7 @@ export function TaskManagement({ eventId, operatorId, tasks, onTasksUpdated }: T
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
                   <button
                     onClick={() => startEditing(task)}
-                    className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-cyan-300"
+                    className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-purple-300"
                     title="Edit task"
                   >
                     <Pencil className="h-3.5 w-3.5" />

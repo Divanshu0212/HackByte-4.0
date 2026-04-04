@@ -119,10 +119,10 @@ export default function OrchestrationSetupPage() {
 
   return (
     <main
-      className="min-h-screen bg-slate-950 text-slate-100"
+      className="min-h-screen bg-[#06040d] text-slate-100"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 20% 10%, rgba(45,212,191,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.2), transparent 30%), linear-gradient(120deg, #020617 0%, #0f172a 45%, #082f49 100%)',
+          'radial-gradient(circle at 20% 10%, rgba(124,58,237,0.24), transparent 35%), radial-gradient(circle at 80% 20%, rgba(168,85,247,0.2), transparent 30%), linear-gradient(120deg, #06040d 0%, #0c0818 45%, #1a1528 100%)',
       }}
     >
       <div className="mx-auto max-w-4xl px-6 pb-20 pt-10 sm:px-10">
@@ -130,17 +130,17 @@ export default function OrchestrationSetupPage() {
         <header className="mb-8">
           <Link
             href="/event-orchestration"
-            className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-cyan-300"
+            className="mb-4 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-purple-300"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Command Deck
           </Link>
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/30 to-teal-500/30">
-              <Sparkles className="h-6 w-6 text-cyan-300" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/30 to-purple-500/30">
+              <Sparkles className="h-6 w-6 text-purple-300" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-cyan-200">ELIXA</p>
+              <p className="text-xs uppercase tracking-[0.35em] text-purple-200">ELIXA</p>
               <h1 className="text-3xl font-bold text-white">Event Setup</h1>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function OrchestrationSetupPage() {
                     size="lg"
                     onClick={handleLaunchEvent}
                     disabled={isCommitting}
-                    className="bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-600 hover:to-teal-600 shadow-lg shadow-cyan-500/25"
+                    className="bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600 shadow-lg shadow-violet-500/25"
                   >
                     {isCommitting ? (
                       <>
@@ -236,7 +236,7 @@ export default function OrchestrationSetupPage() {
               <Button
                 size="lg"
                 onClick={handleGoToDashboard}
-                className="bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-600 hover:to-teal-600"
+                className="bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:from-violet-600 hover:to-purple-600"
               >
                 Go to Dashboard
               </Button>
