@@ -18,11 +18,21 @@ export async function POST(req: Request) {
     }
 
     // First check if event exists
-    const event = await loadOrchestrationEvent(event_id)
+    let event
+    try {
+      event = await loadOrchestrationEvent(event_id)
+    } catch (dbError) {
+      console.error('[Auth] Database error:', dbError)
+      return NextResponse.json(
+        { success: false, error: 'Database connection error. Please try again.' },
+        { status: 503 }
+      )
+    }
+
     if (!event) {
       console.log(`[Auth] Event not found: ${event_id}`)
       return NextResponse.json(
-        { success: false, error: 'Event not found. It may have expired or the server was restarted.' },
+        { success: false, error: 'Event not found. Please check the event ID.' },
         { status: 404 }
       )
     }
@@ -44,8 +54,12 @@ export async function POST(req: Request) {
 
     console.log(`[Auth] Operator authenticated: ${operator.operator_id} (${operator.role})`)
 
-    // Update last active timestamp
-    await updateOperatorLastActive(event_id, operator.operator_id)
+    // Update last active timestamp (don't fail auth if this fails)
+    try {
+      await updateOperatorLastActive(event_id, operator.operator_id)
+    } catch {
+      console.warn('[Auth] Failed to update last active timestamp')
+    }
 
     // Return operator info (client stores in localStorage)
     return NextResponse.json({
@@ -64,7 +78,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Authentication failed',
+        error: 'Authentication failed. Please try again.',
       },
       { status: 500 }
     )

@@ -15,33 +15,60 @@ import type {
 let cachedClient: MongoClient | null = null
 let cachedDb: Db | null = null
 
-async function connectToDatabase() {
+async function connectToDatabase(): Promise<{ client: MongoClient; db: Db }> {
   if (cachedClient && cachedDb) {
-    return { client: cachedClient, db: cachedDb }
+    // Verify connection is still alive
+    try {
+      await cachedDb.command({ ping: 1 })
+      return { client: cachedClient, db: cachedDb }
+    } catch {
+      // Connection lost, reconnect
+      cachedClient = null
+      cachedDb = null
+    }
   }
 
-  if (!process.env.MONGODB_URI) {
+  const uri = process.env.MONGODB_URI
+  if (!uri) {
     throw new Error('MONGODB_URI is not defined in environment variables')
   }
 
-  const client = new MongoClient(process.env.MONGODB_URI, {
+  // Create MongoDB client with TLS workaround for Windows/Node.js compatibility
+  const client = new MongoClient(uri, {
+    // TLS settings to fix Windows OpenSSL issues
     tls: true,
-    tlsAllowInvalidCertificates: false,
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000,
+    tlsAllowInvalidCertificates: true,
+    tlsAllowInvalidHostnames: true,
+    // Connection settings
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+    socketTimeoutMS: 30000,
+    // Retry settings
+    retryWrites: true,
+    retryReads: true,
   })
-  
+
   try {
     await client.connect()
     const db = client.db('elixa')
-
+    
+    // Verify connection works
+    await db.command({ ping: 1 })
+    
     cachedClient = client
     cachedDb = db
 
-    console.log('[DB] Connected to MongoDB')
+    console.log('[DB] Successfully connected to MongoDB Atlas')
     return { client, db }
   } catch (error) {
-    console.error('[DB] MongoDB connection failed:', error)
+    console.error('[DB] MongoDB connection error:', error)
+    try {
+      await client.close()
+    } catch {
+      // Ignore close errors
+    }
     throw error
   }
 }
@@ -65,9 +92,7 @@ export async function saveOrchestrationEvent(
     { $set: updated },
     { upsert: true }
   )
-
-  console.log(`[DB] Saved event: ${eventId} with ${updated.tasks?.length || 0} tasks, ${updated.operators?.length || 0} operators`)
-
+  console.log(`[DB] Saved event: ${eventId}`)
   return { acknowledged: result.acknowledged }
 }
 
@@ -77,7 +102,6 @@ export async function loadOrchestrationEvent(
   const { db } = await connectToDatabase()
 
   const event = await db.collection<OrchestrationEvent>('orchestration_events').findOne({ event_id: eventId } as any)
-
   console.log(`[DB] Load event: ${eventId} - ${event ? 'found' : 'NOT FOUND'}`)
   return event
 }
@@ -92,7 +116,6 @@ export async function listOrchestrationEventsByDirector(
     .find({ director_id: directorId } as any)
     .sort({ created_at: -1 })
     .toArray()
-
   return events
 }
 
@@ -387,7 +410,6 @@ export async function getTaskHistory(
     .sort({ timestamp: -1 })
     .limit(limit)
     .toArray()
-
   return history
 }
 
@@ -451,7 +473,6 @@ export async function getAllEvents(): Promise<OrchestrationEvent[]> {
     .find()
     .sort({ created_at: -1 })
     .toArray()
-
   return events
 }
 

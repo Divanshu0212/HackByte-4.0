@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "set NODE_OPTIONS=--tls-min-v1.0 && next dev",
+    "dev:linux": "NODE_OPTIONS=--tls-min-v1.0 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
