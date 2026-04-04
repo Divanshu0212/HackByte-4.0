@@ -34,14 +34,14 @@ export function ConfirmationCard({
         exit={{ opacity: 0, y: -20, scale: 0.95 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       >
-        <Card className="confirmation-card">
+        <Card className="glass-card confirmation-card">
           <CardHeader className="pb-3">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
+              <div className="p-2 rounded-lg glass-accent">
                 <AlertCircle className="w-5 h-5 text-primary" />
               </div>
               <div className="flex-1">
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg glass-text">
                   {proposal.confirmation_title}
                 </CardTitle>
                 {proposal.type === 'proposal' && (
@@ -69,7 +69,7 @@ export function ConfirmationCard({
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.05 }}
-                      className="flex items-start gap-2 text-sm"
+                      className="flex items-start gap-2 text-sm glass-surface p-2 rounded"
                     >
                       <ArrowRight className="w-4 h-4 text-success shrink-0 mt-0.5" />
                       <span>{change}</span>
@@ -88,7 +88,7 @@ export function ConfirmationCard({
                 </h4>
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   {proposal.untouched.map((item, i) => (
-                    <li key={i} className="flex items-center gap-2">
+                    <li key={i} className="flex items-center gap-2 glass-surface p-2 rounded">
                       <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
                       {item}
                     </li>
@@ -99,7 +99,7 @@ export function ConfirmationCard({
 
             {/* Message */}
             {proposal.message && (
-              <p className="text-sm text-muted-foreground italic border-l-2 border-muted pl-3">
+              <p className="text-sm text-muted-foreground italic border-l-2 border-muted pl-3 glass-surface p-3 rounded">
                 {proposal.message}
               </p>
             )}
@@ -109,7 +109,7 @@ export function ConfirmationCard({
             <Button
               onClick={onConfirm}
               disabled={isProcessing}
-              className="flex-1"
+              className="flex-1 glass-bright-button"
             >
               {isProcessing ? (
                 <>
@@ -127,6 +127,7 @@ export function ConfirmationCard({
               variant="outline"
               onClick={onCancel}
               disabled={isProcessing}
+              className="glass-button"
             >
               Cancel
             </Button>

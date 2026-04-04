@@ -654,25 +654,25 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-3xl space-y-6"
         >
-          <Card className="border-2 border-primary/20 shadow-xl">
+          <Card className="border-2 border-primary/20 shadow-xl glass-card">
             <CardHeader className="text-center space-y-3">
               <div className="flex justify-center">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 glass-button">
                   <Trophy className="w-10 h-10 text-primary" />
                 </div>
               </div>
-              <CardTitle className="text-3xl">Event Complete!</CardTitle>
+              <CardTitle className="text-3xl glass-text">Event Complete!</CardTitle>
               <CardDescription>Here&apos;s your post-event summary</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Winner */}
               {state.teams.length > 0 && (
-                <div className="text-center p-6 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/20 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Winner</p>
-                  <p className="text-2xl font-bold">
+                <div className="text-center p-6 rounded-xl glass-surface border border-amber-200/20">
+                  <p className="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-1">Winner</p>
+                  <p className="text-2xl font-bold glass-text">
                     🏆 {[...state.teams].sort((a, b) => b.score - a.score)[0]?.name}
                   </p>
-                  <p className="text-lg font-mono text-amber-700 dark:text-amber-300">
+                  <p className="text-lg font-mono text-amber-300">
                     {[...state.teams].sort((a, b) => b.score - a.score)[0]?.score} points
                   </p>
                 </div>
@@ -683,9 +683,9 @@ export default function HomePage() {
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Final Standings</h3>
                 <div className="space-y-1.5">
                   {[...state.teams].sort((a, b) => b.score - a.score).map((team, i) => (
-                    <div key={team.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-lg glass-card-hover">
                       <div className="flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-primary/10 text-primary">
+                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold glass-button text-primary">
                           {i + 1}
                         </span>
                         <span className="font-medium">{team.name}</span>
@@ -706,7 +706,7 @@ export default function HomePage() {
 
               {postEventSummary && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="p-4 rounded-xl glass-surface border border-primary/20">
                     <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
                       <Brain className="w-4 h-4" />
                       AI Summary
@@ -754,7 +754,7 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-2xl"
         >
-          <Card className="border-2 shadow-xl">
+          <Card className="border-2 shadow-xl glass-card">
             <CardHeader className="text-center space-y-3">
               <div className="flex justify-center">
                 <motion.div
@@ -763,7 +763,7 @@ export default function HomePage() {
                   className="flex items-center gap-2 font-bold text-4xl"
                 >
                   <Sparkles className="w-10 h-10 text-primary" />
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent glass-text">
                     Elixa
                   </span>
                 </motion.div>
@@ -779,8 +779,8 @@ export default function HomePage() {
                 <label className="text-sm font-medium" htmlFor="event-description">Event Description</label>
                 <textarea
                   id="event-description"
-                  className="w-full min-h-[180px] px-4 py-3 rounded-xl border border-input bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                  placeholder={"Describe your event... For example:\n\n'A trivia quiz with 5 rounds. Teams earn 10 points for correct answers and lose 5 for wrong ones. Top 3 teams advance. Freeze punishment for repeated wrong answers.'"}
+                  className="w-full min-h-[180px] px-4 py-3 rounded-xl glass-input text-sm resize-y transition-all duration-300"
+                  placeholder="Describe your event... For example:\n\nA trivia quiz with 5 rounds. Teams earn 10 points for correct answers and lose 5 for wrong ones. Top 3 teams advance. Freeze punishment for repeated wrong answers."
                   value={eventDescription}
                   onChange={(e) => setEventDescription(e.target.value)}
                 />
