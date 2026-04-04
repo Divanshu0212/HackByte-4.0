@@ -24,15 +24,26 @@ async function connectToDatabase() {
     throw new Error('MONGODB_URI is not defined in environment variables')
   }
 
-  const client = new MongoClient(process.env.MONGODB_URI)
-  await client.connect()
-  const db = client.db('elixa')
+  const client = new MongoClient(process.env.MONGODB_URI, {
+    tls: true,
+    tlsAllowInvalidCertificates: false,
+    serverSelectionTimeoutMS: 30000,
+    connectTimeoutMS: 30000,
+  })
+  
+  try {
+    await client.connect()
+    const db = client.db('elixa')
 
-  cachedClient = client
-  cachedDb = db
+    cachedClient = client
+    cachedDb = db
 
-  console.log('[DB] Connected to MongoDB')
-  return { client, db }
+    console.log('[DB] Connected to MongoDB')
+    return { client, db }
+  } catch (error) {
+    console.error('[DB] MongoDB connection failed:', error)
+    throw error
+  }
 }
 
 // ============ Event Operations ============
