@@ -60,15 +60,21 @@ export async function POST(req: Request) {
     // Add the original description
     event.description = description || ''
 
-    // Save to MongoDB
+    // Save to database (file-based storage)
+    console.log(`[Commit] Saving event: ${eventId} with ${event.tasks.length} tasks, ${event.operators.length} operators`)
     const result = await saveOrchestrationEvent(eventId, event)
 
-    if (!result) {
+    if (!result || !result.acknowledged) {
+      console.error(`[Commit] Failed to save event: ${eventId}`)
       return NextResponse.json(
         { success: false, error: 'Failed to save event to database' },
         { status: 500 }
       )
     }
+
+    console.log(`[Commit] Event saved successfully: ${eventId}`)
+    console.log(`[Commit] Director code: ${directorCode}`)
+    console.log(`[Commit] Operator codes:`, event.operators.map(o => `${o.operator_id} (${o.role})`).join(', '))
 
     // Return the event with all generated codes
     return NextResponse.json({

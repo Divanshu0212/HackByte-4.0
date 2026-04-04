@@ -1,11 +1,9 @@
 /**
  * Orchestration Database Functions
- * File-based storage for persistent data across server restarts
- * Uses JSON files stored in .data directory
+ * MongoDB-based storage for persistent, cloud-accessible data
  */
 
-import fs from 'fs'
-import path from 'path'
+import { MongoClient, Db } from 'mongodb'
 import type {
   OrchestrationEvent,
   OrchestrationTask,
@@ -13,110 +11,28 @@ import type {
   OrchestrationTaskHistoryEntry,
 } from '@/types'
 
-// Data directory for persistent storage
-const DATA_DIR = path.join(process.cwd(), '.data', 'orchestration')
-const EVENTS_FILE = path.join(DATA_DIR, 'events.json')
-const HISTORY_FILE = path.join(DATA_DIR, 'history.json')
+// MongoDB connection
+let cachedClient: MongoClient | null = null
+let cachedDb: Db | null = null
 
-// Ensure data directory exists
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true })
-    console.log(`[DB] Created data directory: ${DATA_DIR}`)
+async function connectToDatabase() {
+  if (cachedClient && cachedDb) {
+    return { client: cachedClient, db: cachedDb }
   }
-}
 
-// Load events from file
-function loadEventsFromFile(): Map<string, OrchestrationEvent> {
-  ensureDataDir()
-  try {
-    if (fs.existsSync(EVENTS_FILE)) {
-      const data = fs.readFileSync(EVENTS_FILE, 'utf-8')
-      const parsed = JSON.parse(data)
-      const map = new Map<string, OrchestrationEvent>()
-      for (const [key, value] of Object.entries(parsed)) {
-        map.set(key, value as OrchestrationEvent)
-      }
-      console.log(`[DB] Loaded ${map.size} events from file`)
-      return map
-    }
-  } catch (error) {
-    console.error('[DB] Error loading events from file:', error)
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MONGODB_URI is not defined in environment variables')
   }
-  return new Map<string, OrchestrationEvent>()
-}
 
-// Load history from file
-function loadHistoryFromFile(): Map<string, OrchestrationTaskHistoryEntry[]> {
-  ensureDataDir()
-  try {
-    if (fs.existsSync(HISTORY_FILE)) {
-      const data = fs.readFileSync(HISTORY_FILE, 'utf-8')
-      const parsed = JSON.parse(data)
-      const map = new Map<string, OrchestrationTaskHistoryEntry[]>()
-      for (const [key, value] of Object.entries(parsed)) {
-        map.set(key, value as OrchestrationTaskHistoryEntry[])
-      }
-      return map
-    }
-  } catch (error) {
-    console.error('[DB] Error loading history from file:', error)
-  }
-  return new Map<string, OrchestrationTaskHistoryEntry[]>()
-}
+  const client = new MongoClient(process.env.MONGODB_URI)
+  await client.connect()
+  const db = client.db('elixa')
 
-// Save events to file
-function saveEventsToFile(events: Map<string, OrchestrationEvent>) {
-  ensureDataDir()
-  try {
-    const obj: Record<string, OrchestrationEvent> = {}
-    events.forEach((value, key) => {
-      obj[key] = value
-    })
-    fs.writeFileSync(EVENTS_FILE, JSON.stringify(obj, null, 2))
-    console.log(`[DB] Saved ${events.size} events to file`)
-  } catch (error) {
-    console.error('[DB] Error saving events to file:', error)
-  }
-}
+  cachedClient = client
+  cachedDb = db
 
-// Save history to file
-function saveHistoryToFile(history: Map<string, OrchestrationTaskHistoryEntry[]>) {
-  ensureDataDir()
-  try {
-    const obj: Record<string, OrchestrationTaskHistoryEntry[]> = {}
-    history.forEach((value, key) => {
-      obj[key] = value
-    })
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(obj, null, 2))
-  } catch (error) {
-    console.error('[DB] Error saving history to file:', error)
-  }
-}
-
-// Extend globalThis type for our caches
-declare global {
-  // eslint-disable-next-line no-var
-  var orchestrationEventCache: Map<string, OrchestrationEvent> | undefined
-  // eslint-disable-next-line no-var
-  var orchestrationHistoryCache: Map<string, OrchestrationTaskHistoryEntry[]> | undefined
-  // eslint-disable-next-line no-var
-  var orchestrationDbInitialized: boolean | undefined
-}
-
-// Initialize caches - load from file on first access
-function getEventCache(): Map<string, OrchestrationEvent> {
-  if (!globalThis.orchestrationEventCache) {
-    globalThis.orchestrationEventCache = loadEventsFromFile()
-  }
-  return globalThis.orchestrationEventCache
-}
-
-function getHistoryCache(): Map<string, OrchestrationTaskHistoryEntry[]> {
-  if (!globalThis.orchestrationHistoryCache) {
-    globalThis.orchestrationHistoryCache = loadHistoryFromFile()
-  }
-  return globalThis.orchestrationHistoryCache
+  console.log('[DB] Connected to MongoDB')
+  return { client, db }
 }
 
 // ============ Event Operations ============
@@ -125,46 +41,48 @@ export async function saveOrchestrationEvent(
   eventId: string,
   data: Partial<OrchestrationEvent>
 ): Promise<{ acknowledged: boolean }> {
-  const eventCache = getEventCache()
-  const existing = eventCache.get(eventId)
+  const { db } = await connectToDatabase()
+
   const updated = {
-    ...existing,
     ...data,
     event_id: eventId,
     updated_at: Date.now(),
   } as OrchestrationEvent
 
-  eventCache.set(eventId, updated)
-  saveEventsToFile(eventCache) // Persist to file
+  const result = await db.collection<OrchestrationEvent>('orchestration_events').updateOne(
+    { event_id: eventId } as any,
+    { $set: updated },
+    { upsert: true }
+  )
 
   console.log(`[DB] Saved event: ${eventId} with ${updated.tasks?.length || 0} tasks, ${updated.operators?.length || 0} operators`)
-  console.log(`[DB] Total events in cache: ${eventCache.size}`)
 
-  return { acknowledged: true }
+  return { acknowledged: result.acknowledged }
 }
 
 export async function loadOrchestrationEvent(
   eventId: string
 ): Promise<OrchestrationEvent | null> {
-  const eventCache = getEventCache()
-  console.log(`[DB] Loading event: ${eventId}, cache size: ${eventCache.size}`)
+  const { db } = await connectToDatabase()
 
-  const event = eventCache.get(eventId)
+  const event = await db.collection<OrchestrationEvent>('orchestration_events').findOne({ event_id: eventId } as any)
+
   console.log(`[DB] Load event: ${eventId} - ${event ? 'found' : 'NOT FOUND'}`)
-  return event || null
+  return event
 }
 
 export async function listOrchestrationEventsByDirector(
   directorId: string
 ): Promise<OrchestrationEvent[]> {
-  const eventCache = getEventCache()
-  const events: OrchestrationEvent[] = []
-  eventCache.forEach((event) => {
-    if (event.director_id === directorId) {
-      events.push(event)
-    }
-  })
-  return events.sort((a, b) => b.created_at - a.created_at)
+  const { db } = await connectToDatabase()
+
+  const events = await db
+    .collection<OrchestrationEvent>('orchestration_events')
+    .find({ director_id: directorId } as any)
+    .sort({ created_at: -1 })
+    .toArray()
+
+  return events
 }
 
 // ============ Task Operations ============
@@ -174,8 +92,7 @@ export async function updateTask(
   taskId: string,
   updates: Partial<OrchestrationTask>
 ): Promise<boolean> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return false
 
   const taskIndex = event.tasks.findIndex((t) => t.task_id === taskId)
@@ -183,8 +100,7 @@ export async function updateTask(
 
   event.tasks[taskIndex] = { ...event.tasks[taskIndex], ...updates }
   event.updated_at = Date.now()
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 
   return true
 }
@@ -195,8 +111,7 @@ export async function completeTask(
   operatorId: string,
   notes?: string
 ): Promise<{ success: boolean; unlockedTasks?: string[]; error?: string }> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return { success: false, error: 'Event not found' }
 
   // Find the task
@@ -258,8 +173,7 @@ export async function completeTask(
   }
 
   event.updated_at = Date.now()
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 
   // Log task history
   await saveTaskHistory(eventId, {
@@ -282,8 +196,7 @@ export async function flagTaskBlocked(
   operatorId: string,
   reason: string
 ): Promise<{ success: boolean; error?: string }> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return { success: false, error: 'Event not found' }
 
   const taskIndex = event.tasks.findIndex((t) => t.task_id === taskId)
@@ -298,8 +211,7 @@ export async function flagTaskBlocked(
     notes: reason,
   }
   event.updated_at = Date.now()
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 
   await saveTaskHistory(eventId, {
     task_id: taskId,
@@ -320,8 +232,7 @@ export async function addTaskNote(
   _operatorId: string,
   note: string
 ): Promise<{ success: boolean; error?: string }> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return { success: false, error: 'Event not found' }
 
   const taskIndex = event.tasks.findIndex((t) => t.task_id === taskId)
@@ -332,8 +243,7 @@ export async function addTaskNote(
     notes: note,
   }
   event.updated_at = Date.now()
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 
   return { success: true }
 }
@@ -344,8 +254,7 @@ export async function getOperatorByCode(
   eventId: string,
   code: string
 ): Promise<OrchestrationOperator | null> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return null
 
   return event.operators.find((o) => o.operator_id === code) || null
@@ -355,8 +264,7 @@ export async function updateOperatorLastActive(
   eventId: string,
   operatorId: string
 ): Promise<void> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return
 
   const opIndex = event.operators.findIndex((o) => o.operator_id === operatorId)
@@ -366,8 +274,7 @@ export async function updateOperatorLastActive(
     ...event.operators[opIndex],
     last_active: Date.now(),
   }
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 }
 
 // ============ Checkpoint Operations ============
@@ -377,8 +284,7 @@ export async function passCheckpoint(
   phase: string,
   directorId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return { success: false, error: 'Event not found' }
 
   // Verify director
@@ -409,8 +315,7 @@ export async function passCheckpoint(
   }
 
   event.updated_at = Date.now()
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 
   console.log(`[DB] Checkpoint passed: ${phase}`)
   return { success: true }
@@ -421,8 +326,7 @@ export async function failCheckpoint(
   phase: string,
   directorId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return { success: false, error: 'Event not found' }
 
   // Verify director
@@ -441,8 +345,7 @@ export async function failCheckpoint(
     passed_by: directorId,
   }
   event.updated_at = Date.now()
-  eventCache.set(eventId, event)
-  saveEventsToFile(eventCache) // Persist to file
+  await saveOrchestrationEvent(eventId, event)
 
   return { success: true }
 }
@@ -453,20 +356,28 @@ export async function saveTaskHistory(
   eventId: string,
   entry: OrchestrationTaskHistoryEntry
 ): Promise<void> {
-  const historyCache = getHistoryCache()
-  const history = historyCache.get(eventId) || []
-  history.push({ ...entry, timestamp: Date.now() })
-  historyCache.set(eventId, history)
-  saveHistoryToFile(historyCache) // Persist to file
+  const { db } = await connectToDatabase()
+
+  await db.collection<OrchestrationTaskHistoryEntry>('orchestration_task_history').insertOne({
+    ...entry,
+    timestamp: Date.now(),
+  } as any)
 }
 
 export async function getTaskHistory(
   eventId: string,
   limit = 50
 ): Promise<OrchestrationTaskHistoryEntry[]> {
-  const historyCache = getHistoryCache()
-  const history = historyCache.get(eventId) || []
-  return history.slice(-limit).reverse()
+  const { db } = await connectToDatabase()
+
+  const history = await db
+    .collection<OrchestrationTaskHistoryEntry>('orchestration_task_history')
+    .find({ event_id: eventId } as any)
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .toArray()
+
+  return history
 }
 
 // ============ Query Helpers ============
@@ -475,8 +386,7 @@ export async function getTasksByOperatorScope(
   eventId: string,
   operatorId: string
 ): Promise<OrchestrationTask[]> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) return []
 
   const operator = event.operators.find((o) => o.operator_id === operatorId)
@@ -497,8 +407,7 @@ export async function getEventProgress(eventId: string): Promise<{
   percentage: number
   byPhase: Record<string, { total: number; completed: number }>
 }> {
-  const eventCache = getEventCache()
-  const event = eventCache.get(eventId)
+  const event = await loadOrchestrationEvent(eventId)
   if (!event) {
     return { total: 0, completed: 0, percentage: 0, byPhase: {} }
   }
@@ -523,16 +432,23 @@ export async function getEventProgress(eventId: string): Promise<{
 
 // ============ Debug Helpers ============
 
-export function getAllEvents(): OrchestrationEvent[] {
-  const eventCache = getEventCache()
-  return Array.from(eventCache.values())
+export async function getAllEvents(): Promise<OrchestrationEvent[]> {
+  const { db } = await connectToDatabase()
+
+  const events = await db
+    .collection<OrchestrationEvent>('orchestration_events')
+    .find()
+    .sort({ created_at: -1 })
+    .toArray()
+
+  return events
 }
 
-export function clearAllEvents(): void {
-  const eventCache = getEventCache()
-  const historyCache = getHistoryCache()
-  eventCache.clear()
-  historyCache.clear()
-  saveEventsToFile(eventCache)
-  saveHistoryToFile(historyCache)
+export async function clearAllEvents(): Promise<void> {
+  const { db } = await connectToDatabase()
+
+  await db.collection('orchestration_events').deleteMany({})
+  await db.collection('orchestration_task_history').deleteMany({})
+
+  console.log('[DB] Cleared all events and history')
 }

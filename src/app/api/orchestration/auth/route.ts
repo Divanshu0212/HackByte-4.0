@@ -35,11 +35,14 @@ export async function POST(req: Request) {
 
     if (!operator) {
       console.log(`[Auth] Operator not found for code: ${access_code}`)
+      console.log(`[Auth] Available operators:`, event.operators.map(o => `${o.operator_id} (${o.role})`))
       return NextResponse.json(
-        { success: false, error: 'Invalid access code. Please check the code and try again.' },
+        { success: false, error: `Invalid access code "${access_code}". Please check the code and try again.` },
         { status: 401 }
       )
     }
+
+    console.log(`[Auth] Operator authenticated: ${operator.operator_id} (${operator.role})`)
 
     // Update last active timestamp
     await updateOperatorLastActive(event_id, operator.operator_id)

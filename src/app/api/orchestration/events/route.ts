@@ -17,7 +17,7 @@ export async function GET(req: Request) {
       events = await listOrchestrationEventsByDirector(directorId)
     } else {
       // Return all events (for demo purposes)
-      events = getAllEvents()
+      events = await getAllEvents()
     }
 
     // Return minimal event data for listing
