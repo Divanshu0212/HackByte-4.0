@@ -1,3 +1,4 @@
+import { Sparkles, Users, Zap } from 'lucide-react';
 import { GameRulesProvider, useGameRules } from './context/GameRulesContext';
 import { VoiceTrackProvider, useVoiceTrack } from './context/VoiceTrackContext';
 import { SessionSetup } from './components/SessionSetup';
@@ -41,11 +42,22 @@ function MainStage({
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header__brand">
-          <span className="app-logo">VoiceTrack</span>
-          <span className="app-tagline">Generative UI · Groq · Voice</span>
+          <span className="app-logo">
+            <Sparkles size={18} style={{ marginRight: 6 }} />
+            Elixa
+          </span>
+          <span className="app-tagline">AI-Powered Events</span>
         </div>
         <div className="app-header__meta">
-          <span>Round {state.round}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <Zap size={14} />
+            Round {state.round}
+          </span>
+          <span className="dot" aria-hidden />
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <Users size={14} />
+            {state.participants.length} teams
+          </span>
           <span className="dot" aria-hidden />
           <span className="capitalize">{state.scoring_mode.replace('_', ' ')}</span>
           {state.suddenDeath ? (

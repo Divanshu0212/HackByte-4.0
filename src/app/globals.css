@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 239 84% 67%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222.2 47.4% 11.2%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 239 84% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Speaking indicator animation */
+body.elixa-speaking .header-brand {
+  @apply animate-pulse-ring;
+}
+
+/* Custom animations */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes score-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-slide-out-left {
+  animation: slide-out-left 0.3s ease-out;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.animate-score-pop {
+  animation: score-pop 0.3s ease-out;
+}
+
+/* Team card status variants */
+.team-card-active {
+  @apply border-border;
+}
+
+.team-card-frozen {
+  @apply border-blue-300 bg-blue-50/50 dark:bg-blue-950/10;
+}
+
+.team-card-defeated {
+  @apply border-destructive/30 opacity-60 grayscale;
+}
+
+.team-card-shielded {
+  @apply border-blue-400 ring-2 ring-blue-200/50;
+}
+
+.team-card-cursed {
+  @apply border-purple-400 ring-2 ring-purple-200/50;
+}
+
+/* Rank badge variants */
+.rank-badge-1 {
+  @apply bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-lg shadow-amber-200/50;
+}
+
+.rank-badge-2 {
+  @apply bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-lg shadow-slate-200/50;
+}
+
+.rank-badge-3 {
+  @apply bg-gradient-to-br from-amber-600 to-amber-700 text-white shadow-lg shadow-amber-200/50;
+}
+
+/* Score delta animations */
+.score-delta-positive {
+  @apply text-success bg-success/10 animate-bounce-in;
+}
+
+.score-delta-negative {
+  @apply text-destructive bg-destructive/10 animate-bounce-in;
+}
+
+/* Confirmation card */
+.confirmation-card {
+  @apply border-2 border-primary/20 shadow-xl shadow-primary/5;
+}
+
+/* Timer display */
+.timer-running {
+  @apply animate-pulse-ring;
+}
+
+.timer-paused {
+  @apply opacity-70;
+}
+
+/* Voice indicator */
+.voice-indicator {
+  @apply relative;
+}
+
+.voice-indicator::after {
+  content: '';
+  @apply absolute inset-0 rounded-full bg-primary/20 animate-ping;
+}

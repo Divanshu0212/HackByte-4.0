@@ -13,6 +13,7 @@ import { useUndoRedo } from '../hooks/useUndoRedo';
 import { interpretVoiceCommand } from '../services/groq';
 import { persistSessionSnapshot } from '../services/persist';
 import { voiceResponseToCommand } from '../dispatcher/applyVoiceActions';
+import { matchPattern } from '../dispatcher/patternMatcher';
 import { useGameRules } from './GameRulesContext';
 
 export const defaultLiveState = (): LiveState => ({
@@ -125,6 +126,45 @@ export function VoiceTrackProvider({ children }: { children: ReactNode }) {
   const runTranscript = useCallback(
     async (text: string) => {
       setLastTranscript(text);
+
+      // ===== STEP 1: Try pattern matching first (fast, no LLM) =====
+      const patternResult = matchPattern(text, stateRef.current);
+
+      if (patternResult.matched) {
+        // Pattern matched! Process locally without LLM call
+        console.log('[Elixa] Pattern matched locally:', patternResult.actions);
+
+        const response = {
+          thought: 'Pattern matched locally - no LLM call needed',
+          observation: `Matched pattern for: "${text}"`,
+          actions: patternResult.actions,
+          commentary: patternResult.commentary,
+        };
+
+        const {
+          command,
+          commentary,
+          systemUndo,
+          systemRedo,
+        } = voiceResponseToCommand(response);
+
+        const traceWithActions = `Pattern Match (local, instant)\n\nActions: ${JSON.stringify(response.actions, null, 2)}`;
+        setLastAgentTrace(traceWithActions);
+
+        if (systemUndo) undo();
+        if (systemRedo) redo();
+        if (command) executeCommand(command);
+
+        if (commentary?.trim()) {
+          scheduleCommentarySpeak(commentary.trim());
+        } else {
+          scheduleCommentarySpeak(null);
+        }
+
+        return;
+      }
+
+      // ===== STEP 2: No pattern match - use LLM =====
       setProcessing(true);
       try {
         const response = await interpretVoiceCommand(
@@ -148,14 +188,14 @@ export function VoiceTrackProvider({ children }: { children: ReactNode }) {
         } = voiceResponseToCommand(response);
 
         const actionCount = response.actions?.length ?? 0;
-        let traceWithActions = trace;
+        let traceWithActions = `LLM Response (Groq)\n\n${trace}`;
         if (actionCount === 0) {
-          traceWithActions += `\n\n(No "actions" in model response — UI will not change. Ask for explicit JSON mutations.)`;
+          traceWithActions += `\n\n(No "actions" in model response — UI will not change.)`;
         } else {
           traceWithActions += `\n\nActions (${actionCount}): ${JSON.stringify(response.actions)}`;
         }
         if (!command && actionCount > 0) {
-          traceWithActions += `\n\n⚠️ Actions could not be applied (malformed or unknown types). Check browser console.`;
+          traceWithActions += `\n\n⚠️ Actions could not be applied. Check browser console.`;
         }
         setLastAgentTrace(traceWithActions);
 
@@ -170,7 +210,7 @@ export function VoiceTrackProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         console.error(e);
-        setLastAgentTrace(String(e instanceof Error ? e.message : e));
+        setLastAgentTrace(`Error: ${e instanceof Error ? e.message : String(e)}`);
       } finally {
         setProcessing(false);
       }
