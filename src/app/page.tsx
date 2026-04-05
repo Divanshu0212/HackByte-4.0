@@ -42,22 +42,48 @@ export default function LandingPage() {
       // Wait for VANTA to be available
       const initVanta = () => {
         if (typeof window !== 'undefined' && (window as any).VANTA && (window as any).THREE) {
-          console.log('Initializing Vanta.js Halo effect')
-          vantaEffect.current = (window as any).VANTA.HALO({
-            el: vantaRef.current,
-            mouseControls: true,
-            touchControls: true,
-            gyroControls: false,
-            minHeight: 200.00,
-            minWidth: 200.00,
-            backgroundColor: 0x06040d,
-            amplitudeFactor: 1.5,
-            xOffset: 0.2,
-            yOffset: -0.1,
-            size: 1.5,
-            baseColor: 0x7c3aed,
-            highlightColor: 0xa855f7
-          })
+          console.log('Initializing Vanta.js effect')
+          
+          // Try HALO first, fallback to WAVES if not available
+          try {
+            if ((window as any).VANTA.HALO) {
+              vantaEffect.current = (window as any).VANTA.HALO({
+                el: vantaRef.current,
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                backgroundColor: 0x06040d,
+                amplitudeFactor: 1.5,
+                xOffset: 0.2,
+                yOffset: -0.1,
+                size: 1.5,
+                baseColor: 0x7c3aed,
+                highlightColor: 0xa855f7
+              })
+            } else if ((window as any).VANTA.WAVES) {
+              // Fallback to WAVES effect
+              vantaEffect.current = (window as any).VANTA.WAVES({
+                el: vantaRef.current,
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                backgroundColor: 0x06040d,
+                color: 0x7c3aed,
+                shininess: 30,
+                waveHeight: 15,
+                waveSpeed: 0.75,
+                zoom: 0.75
+              })
+            } else {
+              console.log('No suitable Vanta effect available')
+            }
+          } catch (error) {
+            console.error('Failed to initialize Vanta effect:', error)
+          }
         } else {
           console.log('VANTA or THREE not available yet')
         }
@@ -73,21 +99,25 @@ export default function LandingPage() {
             initVanta()
             clearInterval(checkVanta)
           }
-        }, 50)
+        }, 100)
 
-        // Cleanup interval after 15 seconds
+        // Cleanup interval after 10 seconds
         setTimeout(() => {
           clearInterval(checkVanta)
-          console.log('Vanta.js loading timeout')
-        }, 15000)
+          console.log('Vanta.js loading timeout - continuing without background effect')
+        }, 10000)
       }
     }
 
     return () => {
       if (vantaEffect.current) {
-        console.log('Destroying Vanta.js effect')
-        vantaEffect.current.destroy()
-        vantaEffect.current = null
+        try {
+          console.log('Destroying Vanta.js effect')
+          vantaEffect.current.destroy()
+          vantaEffect.current = null
+        } catch (error) {
+          console.error('Error destroying Vanta effect:', error)
+        }
       }
     }
   }, [])
