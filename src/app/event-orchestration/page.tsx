@@ -111,7 +111,7 @@ export default function EventOrchestrationPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-purple-300">ELIXA</p>
-              <h1 className="text-5xl font-black uppercase tracking-[0.08em] leading-none text-white sm:text-6xl">
+              <h1 className="text-5xl font-black uppercase tracking-[0.08em] leading-none text-white sm:text-6xl glass-text">
                 Event Orchestration
               </h1>
               <p className="mt-4 max-w-2xl text-lg text-slate-300">
@@ -120,7 +120,7 @@ export default function EventOrchestrationPage() {
               </p>
             </div>
             <Link href="/">
-              <Button variant="outline" className="border-white/20 text-slate-300 hover:bg-white/10">
+              <Button variant="outline" className="glass-button border-white/20 text-slate-300">
                 Back to Command Deck
               </Button>
             </Link>
@@ -136,12 +136,12 @@ export default function EventOrchestrationPage() {
             transition={{ delay: 0.1 }}
           >
             <Link href="/event-orchestration/setup">
-              <Card className="group h-full border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-purple-500/10 text-slate-100 transition hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-500/10">
+              <Card className="group h-full border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-purple-500/10 text-slate-100 glass-card-hover">
                 <CardHeader>
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 text-white">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 text-white glass-button">
                     <Sparkles className="h-7 w-7" />
                   </div>
-                  <CardTitle className="flex items-center justify-between text-2xl text-white">
+                  <CardTitle className="flex items-center justify-between text-2xl text-white glass-text">
                     Create New Event
                     <ArrowRight className="h-5 w-5 text-purple-300 transition group-hover:translate-x-1" />
                   </CardTitle>
@@ -166,12 +166,12 @@ export default function EventOrchestrationPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="h-full border-white/15 bg-[#1a1528]/60 text-slate-100">
+            <Card className="h-full glass-card text-slate-100">
               <CardHeader>
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-white/10 text-slate-300">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl glass-button text-slate-300">
                   <LogIn className="h-7 w-7" />
                 </div>
-                <CardTitle className="text-2xl text-white">Join Existing Event</CardTitle>
+                <CardTitle className="text-2xl text-white glass-text">Join Existing Event</CardTitle>
                 <CardDescription className="text-slate-300">
                   Have an event ID? Enter it below to access the volunteer portal or dashboard.
                 </CardDescription>
@@ -183,7 +183,7 @@ export default function EventOrchestrationPage() {
                     value={eventIdInput}
                     onChange={(e) => setEventIdInput(e.target.value)}
                     placeholder="Enter Event ID (e.g., orch_1234...)"
-                    className="flex-1 rounded-lg border border-white/15 bg-black/30 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-violet-400/50 focus:outline-none"
+                    className="flex-1 rounded-lg glass-input px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -194,7 +194,7 @@ export default function EventOrchestrationPage() {
                     <Button
                       disabled={!eventIdInput}
                       variant="outline"
-                      className="w-full border-white/20 text-slate-300 hover:bg-white/10 disabled:opacity-50"
+                      className="w-full glass-button border-white/20 text-slate-300 disabled:opacity-50"
                     >
                       <Users className="h-4 w-4 mr-2" />
                       Volunteer Portal
@@ -206,7 +206,7 @@ export default function EventOrchestrationPage() {
                   >
                     <Button
                       disabled={!eventIdInput}
-                      className="w-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-50"
+                      className="w-full glass-bright-button text-white disabled:opacity-50"
                     >
                       <RadioTower className="h-4 w-4 mr-2" />
                       Dashboard
@@ -233,22 +233,22 @@ export default function EventOrchestrationPage() {
                   transition={{ duration: 0.35, delay: index * 0.07 }}
                 >
                   <Link href={`/event-orchestration/dashboard/${event.event_id}`}>
-                    <Card className="group h-full border-white/15 bg-[#1a1528]/60 text-slate-100 transition hover:border-violet-400/30 hover:shadow-lg hover:shadow-violet-500/5">
+                    <Card className="group h-full glass-card-hover text-slate-100">
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                           <Badge
                             variant="outline"
                             className={
                               event.status === 'completed'
-                                ? 'border-emerald-500/30 text-emerald-300'
-                                : 'border-violet-500/30 text-violet-300'
+                                ? 'glass-badge-success border-emerald-500/30 text-emerald-300'
+                                : 'glass-badge border-violet-500/30 text-violet-300'
                             }
                           >
                             {event.status}
                           </Badge>
                           <ArrowRight className="h-4 w-4 text-slate-500 transition group-hover:translate-x-1 group-hover:text-violet-300" />
                         </div>
-                        <CardTitle className="text-lg text-white mt-2">{event.name}</CardTitle>
+                        <CardTitle className="text-lg text-white mt-2 glass-text">{event.name}</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
@@ -274,9 +274,9 @@ export default function EventOrchestrationPage() {
                               {event.completed_count}/{event.task_count} tasks
                             </span>
                           </div>
-                          <div className="h-1.5 w-full rounded-full bg-white/10">
+                          <div className="h-1.5 w-full rounded-full glass-progress-track">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all"
+                              className="h-full rounded-full glass-progress-fill transition-all"
                               style={{
                                 width: `${event.task_count > 0 ? (event.completed_count / event.task_count) * 100 : 0}%`,
                               }}
@@ -324,12 +324,12 @@ export default function EventOrchestrationPage() {
                   transition={{ duration: 0.35, delay: 0.3 + index * 0.07 }}
                   key={pillar.title}
                 >
-                  <Card className="h-full border-white/15 bg-[#1a1528]/40 text-slate-100">
+                  <Card className="h-full glass-card text-slate-100">
                     <CardHeader className="pb-2">
-                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-white/10">
+                      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg glass-button">
                         <Icon className="h-5 w-5 text-purple-300" />
                       </div>
-                      <CardTitle className="text-base text-white">{pillar.title}</CardTitle>
+                      <CardTitle className="text-base text-white glass-text">{pillar.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-slate-400">{pillar.text}</p>
@@ -362,11 +362,11 @@ export default function EventOrchestrationPage() {
                 transition={{ delay: 0.5 + i * 0.05 }}
                 className="flex items-center"
               >
-                <div className="flex flex-col items-center rounded-xl border border-white/15 bg-[#1a1528]/60 px-4 py-3 text-center">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-purple-500/30 text-sm font-bold text-purple-200">
-                    {phase.num}
+                <div className="flex flex-col items-center rounded-xl glass-surface px-4 py-3 text-center">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full glass-accent text-sm font-bold text-purple-200">
+                    <span className="glass-text">{phase.num}</span>
                   </div>
-                  <p className="mt-2 text-sm font-medium text-white">{phase.label}</p>
+                  <p className="mt-2 text-sm font-medium text-white glass-text">{phase.label}</p>
                   <p className="text-xs text-slate-500">{phase.desc}</p>
                 </div>
                 {i < 5 && (

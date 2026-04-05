@@ -17,6 +17,13 @@ function parseNumber(str: string): number | null {
   return NUMBER_WORDS[cleaned] ?? null
 }
 
+function parsePositiveInt(str: string): number | null {
+  const parsed = parseNumber(str)
+  if (parsed === null) return null
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return Math.floor(parsed)
+}
+
 function normalizeText(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ')
 }
@@ -261,6 +268,20 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
   }
 
   // ===== ROUND COMMANDS =====
+  const setRoundsMatch = text.match(
+    /^(?:set|change|update)\s+(?:the\s+)?(?:number\s+of\s+)?rounds?\s+(?:to\s+)?(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)$/i
+  )
+  if (setRoundsMatch) {
+    const totalRounds = parsePositiveInt(setRoundsMatch[1])
+    if (totalRounds !== null) {
+      return {
+        matched: true,
+        actions: [{ action: 'set_total_rounds', total_rounds: totalRounds }],
+        commentary: `Total rounds updated to ${totalRounds}.`,
+      }
+    }
+  }
+
   const startRoundMatch = text.match(/^start\s+round\s+(\d+)$/i)
   if (startRoundMatch) {
     const round = parseInt(startRoundMatch[1], 10)
@@ -280,10 +301,18 @@ export function matchPattern(transcript: string, state: LiveState): PatternResul
   }
 
   if (/^(?:next\s+round|advance\s+round)$/i.test(text)) {
+    if (state.round >= state.total_rounds) {
+      return {
+        matched: true,
+        actions: [{ action: 'end_round' }],
+        commentary: `Final round ${state.total_rounds} will now close.`,
+      }
+    }
+
     return {
       matched: true,
       actions: [{ action: 'end_round' }],
-      commentary: `Moving to round ${state.round + 1}!`,
+      commentary: `Moving to round ${Math.min(state.round + 1, state.total_rounds)}!`,
     }
   }
 

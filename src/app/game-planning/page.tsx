@@ -23,6 +23,7 @@ import {
   Megaphone,
   History,
   StopCircle,
+  Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,6 +47,8 @@ const createInitialState = (): LiveState => ({
   teams: [],
   scoring_mode: 'numeric',
   round: 1,
+  total_rounds: 3,
+  round_state: 'not_started',
   timer: { state: 'idle' },
   sudden_death: false,
 })
@@ -70,11 +73,37 @@ const QUICK_COMMANDS = [
   { label: 'Undo', command: 'undo' },
 ]
 
+const GAME_ID = 'game-planning'
+
+type ActiveProfile = {
+  uid: string
+  email?: string
+  displayName?: string
+}
+
+type GameSessionSummary = {
+  session_id: string
+  session_name: string
+  updated_at: number
+}
+
+const normalizeLiveState = (input: LiveState): LiveState => ({
+  ...input,
+  total_rounds: input.total_rounds ?? 3,
+  round_state: input.round_state ?? 'not_started',
+})
+
 // ==============================
 // Main Component
 // ==============================
 
 export default function HomePage() {
+  const [activeProfile, setActiveProfile] = useState<ActiveProfile | null>(null)
+  const [sessions, setSessions] = useState<GameSessionSummary[]>([])
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('')
+  const [manualSaveLoading, setManualSaveLoading] = useState(false)
+
   // ===== Phase State =====
   const [setupPhase, setSetupPhase] = useState<'setup' | 'compiling' | 'live' | 'ended'>('setup')
   const [eventDescription, setEventDescription] = useState('')
@@ -104,9 +133,209 @@ export default function HomePage() {
   const futureRef = useRef<LiveState[]>([])
   const commandInputRef = useRef<HTMLInputElement>(null)
 
+  const getPersistPayload = useCallback(() => {
+    return {
+      state: stateRef.current,
+      eventDescription,
+      compiledRules,
+      setupPhase,
+      activityLog,
+      agentTrace,
+      lastTranscript,
+      savedAt: Date.now(),
+    }
+  }, [eventDescription, compiledRules, setupPhase, activityLog, agentTrace, lastTranscript])
+
+  const refreshSessions = useCallback(async (uid: string) => {
+    try {
+      const response = await fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'list_game_sessions',
+          userId: uid,
+          gameId: GAME_ID,
+        }),
+      })
+
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load sessions')
+      }
+
+      const nextSessions = (result.data?.sessions || []) as GameSessionSummary[]
+      setSessions(nextSessions)
+
+      if (!selectedSessionId && nextSessions.length > 0) {
+        setSelectedSessionId(nextSessions[0].session_id)
+      }
+    } catch (error) {
+      console.warn('Unable to list sessions:', error)
+    }
+  }, [selectedSessionId])
+
+  const saveCurrentSession = useCallback(async (manual = false) => {
+    if (!activeSessionId || !activeProfile?.uid) {
+      return
+    }
+
+    if (manual) {
+      setManualSaveLoading(true)
+    }
+
+    try {
+      const response = await fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_game_session',
+          sessionId: activeSessionId,
+          userId: activeProfile.uid,
+          data: getPersistPayload(),
+        }),
+      })
+
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save session')
+      }
+
+      if (manual) {
+        toast.success('Progress saved to session')
+      }
+
+      void refreshSessions(activeProfile.uid)
+    } catch (error) {
+      console.warn('Session save failed:', error)
+      if (manual) {
+        toast.error('Could not save progress')
+      }
+    } finally {
+      if (manual) {
+        setManualSaveLoading(false)
+      }
+    }
+  }, [activeSessionId, activeProfile?.uid, getPersistPayload, refreshSessions])
+
+  const createSessionForCurrentUser = useCallback(async (name?: string) => {
+    if (!activeProfile?.uid) {
+      toast.error('Sign in from the landing page first.')
+      return null
+    }
+
+    try {
+      const response = await fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_game_session',
+          userId: activeProfile.uid,
+          gameId: GAME_ID,
+          sessionName: name || `Game Session ${new Date().toLocaleString()}`,
+          data: getPersistPayload(),
+        }),
+      })
+
+      const result = await response.json()
+      if (!result.success || !result.data?.session) {
+        throw new Error(result.error || 'Failed to create session')
+      }
+
+      const nextSession = result.data.session as GameSessionSummary
+      setActiveSessionId(nextSession.session_id)
+      setSelectedSessionId(nextSession.session_id)
+      await refreshSessions(activeProfile.uid)
+      return nextSession.session_id
+    } catch (error) {
+      console.error('Session creation failed:', error)
+      toast.error('Could not create session')
+      return null
+    }
+  }, [activeProfile?.uid, getPersistPayload, refreshSessions])
+
+  const loadSessionIntoState = useCallback(async (sessionIdToLoad: string) => {
+    if (!activeProfile?.uid || !sessionIdToLoad) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/persist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'load_game_session',
+          sessionId: sessionIdToLoad,
+          userId: activeProfile.uid,
+        }),
+      })
+
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to load session')
+      }
+
+      const progress = result.data?.session?.progress as
+        | {
+            state?: LiveState
+            eventDescription?: string
+            compiledRules?: Record<string, unknown> | null
+            setupPhase?: 'setup' | 'compiling' | 'live' | 'ended'
+            activityLog?: ActivityEntry[]
+            agentTrace?: string
+            lastTranscript?: string
+          }
+        | undefined
+
+      if (!progress?.state) {
+        toast.info('Session exists but has no saved progress yet.')
+        setActiveSessionId(sessionIdToLoad)
+        return
+      }
+
+      const normalizedState = normalizeLiveState(progress.state)
+      setState(normalizedState)
+      setEventDescription(progress.eventDescription || '')
+      setCompiledRules(progress.compiledRules || null)
+      setSetupPhase(progress.setupPhase || 'setup')
+      setActivityLog(progress.activityLog || [])
+      setAgentTrace(progress.agentTrace || '')
+      setLastTranscript(progress.lastTranscript || '')
+      setActiveSessionId(sessionIdToLoad)
+      stateRef.current = normalizedState
+      toast.success('Session restored')
+    } catch (error) {
+      console.error('Session load failed:', error)
+      toast.error('Could not load session')
+    }
+  }, [activeProfile?.uid])
+
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    const rawProfile = localStorage.getItem('elixa:activeProfile')
+    if (!rawProfile) {
+      return
+    }
+
+    try {
+      const profile = JSON.parse(rawProfile) as ActiveProfile
+      if (profile?.uid) {
+        setActiveProfile(profile)
+      }
+    } catch {
+      console.warn('Invalid active profile in localStorage')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!activeProfile?.uid) {
+      return
+    }
+
+    void refreshSessions(activeProfile.uid)
+  }, [activeProfile?.uid, refreshSessions])
 
   // ===== Speech Recognition =====
   const { isListening, lastError: speechError, start: startListening, stop: stopListening } = useSpeechRecognition(
@@ -117,28 +346,16 @@ export default function HomePage() {
     }
   )
 
-  // ===== Persist state to MongoDB (debounced) =====
+  // ===== Persist state to session store (debounced) =====
   const persistRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (setupPhase !== 'live') return
+    if (setupPhase !== 'live' || !activeSessionId || !activeProfile?.uid) return
     if (persistRef.current) clearTimeout(persistRef.current)
     persistRef.current = setTimeout(() => {
-      fetch('/api/persist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save_event',
-          eventId: state.event_id,
-          data: {
-            ...state,
-            eventDescription,
-            compiledRules,
-          },
-        }),
-      }).catch((e) => console.warn('Persist failed:', e))
+      void saveCurrentSession(false)
     }, 2000)
     return () => { if (persistRef.current) clearTimeout(persistRef.current) }
-  }, [state, setupPhase, eventDescription, compiledRules])
+  }, [state, setupPhase, eventDescription, compiledRules, activeSessionId, activeProfile?.uid, saveCurrentSession])
 
   // ===== Apply Actions =====
   const applyActions = useCallback((actions: VoiceAction[]) => {
@@ -185,6 +402,11 @@ export default function HomePage() {
           }
 
           case 'update_score': {
+            if (newState.round_state === 'completed') {
+              toast.info('All rounds are complete. Start a new event or update rounds to continue scoring.')
+              break
+            }
+
             const ti = newState.teams.findIndex((t) => t.id === action.id)
             if (ti >= 0) {
               // Check freeze status
@@ -200,6 +422,11 @@ export default function HomePage() {
           }
 
           case 'set_score': {
+            if (newState.round_state === 'completed') {
+              toast.info('All rounds are complete. Start a new event or update rounds to continue scoring.')
+              break
+            }
+
             const ti = newState.teams.findIndex((t) => t.id === action.id)
             if (ti >= 0) {
               newState.teams[ti].score = action.score
@@ -276,12 +503,27 @@ export default function HomePage() {
           }
 
           case 'start_round': {
-            newState.round = action.round
+            const targetRound = Math.max(1, Math.min(action.round, newState.total_rounds))
+            newState.round = targetRound
+            newState.round_state = 'in_progress'
             break
           }
 
           case 'end_round': {
-            newState.round += 1
+            if (newState.round_state === 'not_started') {
+              newState.round_state = 'in_progress'
+              break
+            }
+
+            if (newState.round >= newState.total_rounds) {
+              newState.round = newState.total_rounds
+              newState.round_state = 'completed'
+              newState.timer = { state: 'idle', duration_sec: newState.timer.duration_sec }
+            } else {
+              newState.round += 1
+              newState.round_state = 'in_progress'
+            }
+
             // Tick timed effects
             newState.teams = newState.teams.map(t => {
               const next = { ...t }
@@ -304,6 +546,21 @@ export default function HomePage() {
               }
               return next
             })
+            break
+          }
+
+          case 'set_total_rounds': {
+            const total = Math.max(1, Math.min(action.total_rounds, 20))
+            newState.total_rounds = total
+
+            if (newState.round > total) {
+              newState.round = total
+            }
+
+            if (newState.round_state === 'completed' && newState.round < total) {
+              newState.round_state = 'in_progress'
+            }
+
             break
           }
 
@@ -353,6 +610,10 @@ export default function HomePage() {
 
   // Persist score events to MongoDB
   const persistScoreEvent = useCallback(async (actions: VoiceAction[], source: string) => {
+    if (!activeProfile?.uid) {
+      return
+    }
+
     for (const action of actions) {
       if (action.action === 'update_score' || action.action === 'set_score') {
         try {
@@ -361,7 +622,8 @@ export default function HomePage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'save_score_event',
-              eventId: stateRef.current.event_id,
+              sessionId: activeSessionId || stateRef.current.event_id,
+              userId: activeProfile.uid,
               data: {
                 ...action,
                 source,
@@ -375,7 +637,7 @@ export default function HomePage() {
         }
       }
     }
-  }, [])
+  }, [activeSessionId, activeProfile?.uid])
 
   // ===== Handle Voice Command (core routing) =====
   const handleVoiceCommand = useCallback(async (transcript: string) => {
@@ -444,7 +706,8 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_agent_log',
-          eventId: currentState.event_id,
+          sessionId: activeSessionId || currentState.event_id,
+          userId: activeProfile?.uid,
           data: {
             command: transcript,
             response: agentResponse,
@@ -483,7 +746,7 @@ export default function HomePage() {
       setIsProcessing(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyActions, persistScoreEvent, activityLog])
+  }, [applyActions, persistScoreEvent, activityLog, activeSessionId, activeProfile?.uid])
 
   // ===== Text Command Submit =====
   const handleTextCommandSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
@@ -581,11 +844,23 @@ export default function HomePage() {
     }
   }
 
-  const handleStartEvent = () => {
+  const handleStartEvent = async () => {
+    let targetSessionId = activeSessionId
+    if (!targetSessionId) {
+      targetSessionId = await createSessionForCurrentUser(
+        eventDescription.trim() ? `${eventDescription.trim().slice(0, 40)}...` : undefined
+      )
+    }
+
+    if (!targetSessionId) {
+      return
+    }
+
     setState((prev) => ({
       ...prev,
       event_id: `event_${Date.now()}`,
     }))
+    setActiveSessionId(targetSessionId)
     setSetupPhase('live')
     toast.success('Event started! Use voice commands to manage.')
   }
@@ -602,7 +877,7 @@ export default function HomePage() {
           eventId: state.event_id,
           eventName: eventDescription || 'Event',
           teams: state.teams,
-          rounds: state.round,
+          rounds: state.total_rounds,
         }),
       })
       const result = await response.json()
@@ -654,25 +929,25 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-3xl space-y-6"
         >
-          <Card className="border-2 border-primary/20 shadow-xl">
+          <Card className="border-2 border-primary/20 shadow-xl glass-card">
             <CardHeader className="text-center space-y-3">
               <div className="flex justify-center">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 glass-button">
                   <Trophy className="w-10 h-10 text-primary" />
                 </div>
               </div>
-              <CardTitle className="text-3xl">Event Complete!</CardTitle>
+              <CardTitle className="text-3xl glass-text">Event Complete!</CardTitle>
               <CardDescription>Here&apos;s your post-event summary</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Winner */}
               {state.teams.length > 0 && (
-                <div className="text-center p-6 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/20 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Winner</p>
-                  <p className="text-2xl font-bold">
+                <div className="text-center p-6 rounded-xl glass-surface border border-amber-200/20">
+                  <p className="text-sm font-semibold text-amber-400 uppercase tracking-wider mb-1">Winner</p>
+                  <p className="text-2xl font-bold glass-text">
                     🏆 {[...state.teams].sort((a, b) => b.score - a.score)[0]?.name}
                   </p>
-                  <p className="text-lg font-mono text-amber-700 dark:text-amber-300">
+                  <p className="text-lg font-mono text-amber-300">
                     {[...state.teams].sort((a, b) => b.score - a.score)[0]?.score} points
                   </p>
                 </div>
@@ -683,9 +958,9 @@ export default function HomePage() {
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Final Standings</h3>
                 <div className="space-y-1.5">
                   {[...state.teams].sort((a, b) => b.score - a.score).map((team, i) => (
-                    <div key={team.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <div key={team.id} className="flex items-center justify-between p-3 rounded-lg glass-card-hover">
                       <div className="flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-primary/10 text-primary">
+                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold glass-button text-primary">
                           {i + 1}
                         </span>
                         <span className="font-medium">{team.name}</span>
@@ -706,7 +981,7 @@ export default function HomePage() {
 
               {postEventSummary && (
                 <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <div className="p-4 rounded-xl glass-surface border border-primary/20">
                     <h3 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
                       <Brain className="w-4 h-4" />
                       AI Summary
@@ -754,7 +1029,7 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-2xl"
         >
-          <Card className="border-2 shadow-xl">
+          <Card className="border-2 shadow-xl glass-card">
             <CardHeader className="text-center space-y-3">
               <div className="flex justify-center">
                 <motion.div
@@ -763,7 +1038,7 @@ export default function HomePage() {
                   className="flex items-center gap-2 font-bold text-4xl"
                 >
                   <Sparkles className="w-10 h-10 text-primary" />
-                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent glass-text">
                     Elixa
                   </span>
                 </motion.div>
@@ -774,16 +1049,81 @@ export default function HomePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="space-y-3 rounded-xl border border-border/70 bg-muted/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Session</p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeProfile?.displayName || activeProfile?.email || 'Not signed in'}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={selectedSessionId}
+                    onChange={(e) => setSelectedSessionId(e.target.value)}
+                  >
+                    <option value="">Select a saved session</option>
+                    {sessions.map((session) => (
+                      <option key={session.session_id} value={session.session_id}>
+                        {session.session_name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!selectedSessionId}
+                    onClick={() => void loadSessionIntoState(selectedSessionId)}
+                  >
+                    Load Session
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void createSessionForCurrentUser()}
+                  >
+                    New Session
+                  </Button>
+                </div>
+
+                {activeSessionId && (
+                  <p className="text-xs text-muted-foreground">Active session ID: {activeSessionId}</p>
+                )}
+              </div>
+
               {/* Event Description */}
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="event-description">Event Description</label>
                 <textarea
                   id="event-description"
-                  className="w-full min-h-[180px] px-4 py-3 rounded-xl border border-input bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
-                  placeholder={"Describe your event... For example:\n\n'A trivia quiz with 5 rounds. Teams earn 10 points for correct answers and lose 5 for wrong ones. Top 3 teams advance. Freeze punishment for repeated wrong answers.'"}
+                  className="w-full min-h-[180px] px-4 py-3 rounded-xl glass-input text-sm resize-y transition-all duration-300"
+                  placeholder="Describe your event... For example:\n\nA trivia quiz with 5 rounds. Teams earn 10 points for correct answers and lose 5 for wrong ones. Top 3 teams advance. Freeze punishment for repeated wrong answers."
                   value={eventDescription}
                   onChange={(e) => setEventDescription(e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="round-count">Total Rounds</label>
+                <input
+                  id="round-count"
+                  type="number"
+                  min={1}
+                  max={20}
+                  className="w-full rounded-xl border border-input bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  value={state.total_rounds}
+                  onChange={(e) => {
+                    const next = Number.parseInt(e.target.value, 10)
+                    const safe = Number.isFinite(next) ? Math.max(1, Math.min(next, 20)) : 1
+                    setState((prev) => ({ ...prev, total_rounds: safe, round: Math.min(prev.round, safe) }))
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Voice command also works: &quot;change rounds to 4&quot;.
+                </p>
               </div>
 
               {/* Compiled Rules Preview */}
@@ -875,10 +1215,16 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+            {activeSessionId && (
+              <Badge variant="outline" className="hidden md:inline-flex">Session Active</Badge>
+            )}
             <div className="flex items-center gap-1">
               <Zap className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">Round</span> {state.round}
+              <span className="hidden xs:inline">Round</span> {state.round}/{state.total_rounds}
             </div>
+            <Badge variant={state.round_state === 'completed' ? 'destructive' : 'secondary'} className="hidden sm:inline-flex text-[10px]">
+              {state.round_state === 'not_started' ? 'ROUND PENDING' : state.round_state === 'in_progress' ? 'ROUND LIVE' : 'ROUNDS COMPLETE'}
+            </Badge>
             <div className="flex items-center gap-1">
               <Users className="w-3.5 h-3.5" />
               <span>{state.teams.length}</span>
@@ -887,6 +1233,16 @@ export default function HomePage() {
             {state.sudden_death && (
               <Badge variant="destructive" className="text-[10px]">SUDDEN DEATH</Badge>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2"
+              onClick={() => void saveCurrentSession(true)}
+              disabled={!activeSessionId || manualSaveLoading}
+            >
+              {manualSaveLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline ml-1">Save</span>
+            </Button>
             <Button
               variant="ghost"
               size="sm"
