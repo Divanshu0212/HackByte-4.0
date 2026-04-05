@@ -64,9 +64,10 @@ export default function VolunteerPage() {
         throw new Error(data.error || 'Failed to fetch event')
       }
 
-      setEvent(data.data)
+      setEvent(data.data.event || data.data)
       // Tasks are already filtered to operator scope by the API
-      setTasks(data.data.tasks)
+      // Ensure tasks is always an array, never undefined
+      setTasks(data.data.tasks || data.data.event?.tasks || [])
     } catch (error) {
       console.error('Fetch error:', error)
       toast.error('Failed to load tasks')
@@ -258,16 +259,13 @@ export default function VolunteerPage() {
   const progress = {
     total: tasks.length,
     completed: tasks.filter((t) => t.status === 'completed').length,
-    percentage:
-      tasks.length > 0
-        ? Math.round((tasks.filter((t) => t.status === 'completed').length / tasks.length) * 100)
-        : 0,
+    percentage: tasks.length > 0
+      ? Math.round((tasks.filter((t) => t.status === 'completed').length / tasks.length) * 100)
+      : 0,
   }
 
   // Group tasks by status
-  const availableTasks = tasks.filter(
-    (t) => t.status === 'available' || t.status === 'in_progress'
-  )
+  const availableTasks = tasks.filter((t) => t.status === 'available' || t.status === 'in_progress')
   const completedTasks = tasks.filter((t) => t.status === 'completed')
   const blockedTasks = tasks.filter((t) => t.status === 'blocked')
   const lockedTasks = tasks.filter((t) => t.status === 'locked')

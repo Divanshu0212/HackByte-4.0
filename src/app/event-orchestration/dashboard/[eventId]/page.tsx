@@ -565,19 +565,16 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {session && (
+        {isDirector && (
           <section className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div className="space-y-4">
               <div className="flex flex-col gap-3 rounded-[28px] border border-violet-500/20 bg-[linear-gradient(135deg,rgba(124,58,237,0.16),rgba(15,23,42,0.45))] p-5 shadow-xl shadow-violet-950/20 sm:flex-row sm:items-end sm:justify-between lg:p-6">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-violet-300">
-                    {isDirector ? 'Director Controls' : 'Task Overview'}
-                  </p>
+                  <p className="text-xs uppercase tracking-[0.35em] text-violet-300">Director Controls</p>
                   <h2 className="mt-2 text-2xl font-bold text-white">Task Management</h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                    {isDirector
-                      ? 'Create, reorder, and tune task dependencies here before sending the team back into execution mode. This stays front and center so you can adjust the plan without hunting through the dashboard.'
-                      : 'View all tasks and their current status. Only directors can add, edit, or remove tasks.'}
+                    Create, reorder, and tune task dependencies here before sending the team back into execution mode.
+                    This stays front and center so you can adjust the plan without hunting through the dashboard.
                   </p>
                 </div>
                 <div className="grid grid-cols-3 gap-3 sm:min-w-[260px]">
@@ -603,7 +600,6 @@ export default function DashboardPage() {
                 operatorId={session.operator_id}
                 tasks={event.tasks}
                 onTasksUpdated={handleRefresh}
-                isDirector={isDirector}
               />
             </div>
 
@@ -773,6 +769,20 @@ export default function DashboardPage() {
                   ))}
                 </CardContent>
               </Card>
+
+              {/* Activity Feed */}
+              <ActivityFeed eventId={eventId} />
+
+              {/* Announcements Panel (Director Only) */}
+              {isDirector && session && (
+                <AnnouncementsPanel
+                  eventId={eventId}
+                  operatorId={session.operator_id}
+                  announcements={announcements}
+                  isDirector={isDirector}
+                  onAnnouncementSent={handleRefresh}
+                />
+              )}
             </div>
 
           </aside>
