@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Script from 'next/script'
 import { Toaster } from 'sonner'
 import { AppTransitionShell } from '@/components/app-shell/app-transition-shell'
 import './globals.css'
@@ -38,6 +37,7 @@ export default function RootLayout({
         </div>
         
         <script async src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+        <script async src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.waves.min.js"></script>
         <script async src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.halo.min.js"></script>
         
         <div className="relative z-10">
