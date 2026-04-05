@@ -9,6 +9,10 @@ import type {
   OrchestrationTask,
   OrchestrationOperator,
   OrchestrationTaskHistoryEntry,
+  OrchestrationAnnouncement,
+  OrchestrationActivityLog,
+  OrchestrationActivityType,
+  OrchestrationPhaseId,
 } from '@/types'
 
 // MongoDB connection
@@ -220,6 +224,18 @@ export async function completeTask(
     notes,
   })
 
+  // Log activity
+  await logTaskActivity(
+    eventId,
+    operatorId,
+    operator.label,
+    'task_completed',
+    taskId,
+    task.title,
+    task.phase,
+    { notes }
+  )
+
   console.log(`[DB] Task completed: ${task.title} - unlocked ${unlockedTasks.length} tasks`)
   return { success: true, unlockedTasks }
 }
@@ -239,6 +255,9 @@ export async function flagTaskBlocked(
   const task = event.tasks[taskIndex]
   const oldStatus = task.status
 
+  // Find operator for activity log
+  const operator = event.operators.find((o) => o.operator_id === operatorId)
+
   event.tasks[taskIndex] = {
     ...task,
     status: 'blocked',
@@ -257,13 +276,25 @@ export async function flagTaskBlocked(
     notes: reason,
   })
 
+  // Log activity
+  await logTaskActivity(
+    eventId,
+    operatorId,
+    operator?.label || 'Unknown',
+    'task_flagged',
+    taskId,
+    task.title,
+    task.phase,
+    { reason }
+  )
+
   return { success: true }
 }
 
 export async function addTaskNote(
   eventId: string,
   taskId: string,
-  _operatorId: string,
+  operatorId: string,
   note: string
 ): Promise<{ success: boolean; error?: string }> {
   const event = await loadOrchestrationEvent(eventId)
@@ -272,12 +303,29 @@ export async function addTaskNote(
   const taskIndex = event.tasks.findIndex((t) => t.task_id === taskId)
   if (taskIndex === -1) return { success: false, error: 'Task not found' }
 
+  const task = event.tasks[taskIndex]
+
+  // Find operator for activity log
+  const operator = event.operators.find((o) => o.operator_id === operatorId)
+
   event.tasks[taskIndex] = {
     ...event.tasks[taskIndex],
     notes: note,
   }
   event.updated_at = Date.now()
   await saveOrchestrationEvent(eventId, event)
+
+  // Log activity
+  await logTaskActivity(
+    eventId,
+    operatorId,
+    operator?.label || 'Unknown',
+    'task_note_added',
+    taskId,
+    task.title,
+    task.phase,
+    { note }
+  )
 
   return { success: true }
 }
@@ -317,7 +365,7 @@ export async function passCheckpoint(
   eventId: string,
   phase: string,
   directorId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; isGoNoGo?: boolean }> {
   const event = await loadOrchestrationEvent(eventId)
   if (!event) return { success: false, error: 'Event not found' }
 
@@ -351,8 +399,21 @@ export async function passCheckpoint(
   event.updated_at = Date.now()
   await saveOrchestrationEvent(eventId, event)
 
+  // Log activity
+  await logActivity({
+    log_id: '',
+    event_id: eventId,
+    operator_id: directorId,
+    operator_label: director.label,
+    action_type: 'checkpoint_passed',
+    checkpoint_id: checkpoint.checkpoint_id,
+    phase: phase as OrchestrationPhaseId,
+    details: { checkpoint_name: checkpoint.name, is_gonogo: phase === 'gonogo' },
+    timestamp: Date.now(),
+  })
+
   console.log(`[DB] Checkpoint passed: ${phase}`)
-  return { success: true }
+  return { success: true, isGoNoGo: phase === 'gonogo' }
 }
 
 export async function failCheckpoint(
@@ -372,14 +433,29 @@ export async function failCheckpoint(
   const cpIndex = event.checkpoints.findIndex((cp) => cp.phase === phase)
   if (cpIndex === -1) return { success: false, error: 'Checkpoint not found' }
 
+  const checkpoint = event.checkpoints[cpIndex]
+
   event.checkpoints[cpIndex] = {
-    ...event.checkpoints[cpIndex],
+    ...checkpoint,
     status: 'failed',
     passed_at: Date.now(),
     passed_by: directorId,
   }
   event.updated_at = Date.now()
   await saveOrchestrationEvent(eventId, event)
+
+  // Log activity
+  await logActivity({
+    log_id: '',
+    event_id: eventId,
+    operator_id: directorId,
+    operator_label: director.label,
+    action_type: 'checkpoint_failed',
+    checkpoint_id: checkpoint.checkpoint_id,
+    phase: phase as OrchestrationPhaseId,
+    details: { checkpoint_name: checkpoint.name },
+    timestamp: Date.now(),
+  })
 
   return { success: true }
 }
@@ -481,6 +557,140 @@ export async function clearAllEvents(): Promise<void> {
 
   await db.collection('orchestration_events').deleteMany({})
   await db.collection('orchestration_task_history').deleteMany({})
+  await db.collection('orchestration_activity_logs').deleteMany({})
 
   console.log('[DB] Cleared all events and history')
+}
+
+// ============ Announcement Operations ============
+
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
+export async function createAnnouncement(
+  eventId: string,
+  operatorId: string,
+  message: string,
+  voiceEnabled: boolean = false,
+  broadcastTo: 'all' | 'operators' | OrchestrationPhaseId[] = 'all'
+): Promise<{ success: boolean; announcement?: OrchestrationAnnouncement; error?: string }> {
+  const event = await loadOrchestrationEvent(eventId)
+  if (!event) return { success: false, error: 'Event not found' }
+
+  // Verify operator is director
+  const operator = event.operators.find((o) => o.operator_id === operatorId)
+  if (!operator || operator.role !== 'director') {
+    return { success: false, error: 'Only directors can create announcements' }
+  }
+
+  const announcement: OrchestrationAnnouncement = {
+    announcement_id: generateUUID(),
+    event_id: eventId,
+    message,
+    created_by: operatorId,
+    sent_at: Date.now(),
+    voice_enabled: voiceEnabled,
+    broadcast_to: broadcastTo,
+    created_at: Date.now(),
+  }
+
+  // Add to event's announcements array
+  if (!event.announcements) {
+    event.announcements = []
+  }
+  event.announcements.push(announcement)
+  event.updated_at = Date.now()
+
+  await saveOrchestrationEvent(eventId, event)
+
+  // Log the activity
+  await logActivity({
+    log_id: generateUUID(),
+    event_id: eventId,
+    operator_id: operatorId,
+    operator_label: operator.label,
+    action_type: 'announcement_sent',
+    details: { message, voice_enabled: voiceEnabled },
+    timestamp: Date.now(),
+  })
+
+  console.log(`[DB] Announcement created: ${message.substring(0, 50)}...`)
+  return { success: true, announcement }
+}
+
+export async function getAnnouncements(
+  eventId: string,
+  limit: number = 50
+): Promise<OrchestrationAnnouncement[]> {
+  const event = await loadOrchestrationEvent(eventId)
+  if (!event || !event.announcements) return []
+
+  return event.announcements
+    .sort((a, b) => b.created_at - a.created_at)
+    .slice(0, limit)
+}
+
+// ============ Activity Log Operations ============
+
+export async function logActivity(
+  activity: OrchestrationActivityLog
+): Promise<void> {
+  const { db } = await connectToDatabase()
+
+  await db.collection<OrchestrationActivityLog>('orchestration_activity_logs').insertOne({
+    ...activity,
+    log_id: activity.log_id || generateUUID(),
+    timestamp: activity.timestamp || Date.now(),
+  } as any)
+
+  console.log(`[DB] Activity logged: ${activity.action_type}`)
+}
+
+export async function getActivityFeed(
+  eventId: string,
+  limit: number = 100,
+  operatorRole?: string
+): Promise<OrchestrationActivityLog[]> {
+  const { db } = await connectToDatabase()
+
+  const query: Record<string, unknown> = { event_id: eventId }
+
+  const activities = await db
+    .collection<OrchestrationActivityLog>('orchestration_activity_logs')
+    .find(query as any)
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .toArray()
+
+  return activities
+}
+
+// Helper function to log task-related activities
+export async function logTaskActivity(
+  eventId: string,
+  operatorId: string,
+  operatorLabel: string,
+  actionType: OrchestrationActivityType,
+  taskId: string,
+  taskTitle: string,
+  phase: OrchestrationPhaseId,
+  details?: Record<string, unknown>
+): Promise<void> {
+  await logActivity({
+    log_id: generateUUID(),
+    event_id: eventId,
+    operator_id: operatorId,
+    operator_label: operatorLabel,
+    action_type: actionType,
+    task_id: taskId,
+    task_title: taskTitle,
+    phase,
+    details,
+    timestamp: Date.now(),
+  })
 }

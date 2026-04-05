@@ -376,6 +376,7 @@ export interface OrchestrationEvent {
   tasks: OrchestrationTask[]
   operators: OrchestrationOperator[]
   checkpoints: OrchestrationCheckpoint[]
+  announcements?: OrchestrationAnnouncement[] // Director broadcast messages
 }
 
 // AI-generated config (before commit)
@@ -419,4 +420,43 @@ export interface OrchestrationSession {
   role: OrchestrationOperatorRole
   scope: OrchestrationPhaseId[]
   label: string
+}
+
+// ============ Orchestration Announcements ============
+
+export interface OrchestrationAnnouncement {
+  announcement_id: string
+  event_id: string
+  message: string
+  created_by: string // operator_id
+  scheduled_at?: number // null = immediate
+  sent_at?: number
+  voice_enabled: boolean
+  broadcast_to: 'all' | 'operators' | OrchestrationPhaseId[]
+  created_at: number
+}
+
+// ============ Orchestration Activity Log ============
+
+export type OrchestrationActivityType =
+  | 'task_completed'
+  | 'task_flagged'
+  | 'task_note_added'
+  | 'checkpoint_passed'
+  | 'checkpoint_failed'
+  | 'announcement_sent'
+  | 'operator_joined'
+
+export interface OrchestrationActivityLog {
+  log_id: string
+  event_id: string
+  operator_id: string
+  operator_label?: string
+  action_type: OrchestrationActivityType
+  task_id?: string
+  task_title?: string
+  checkpoint_id?: string
+  phase?: OrchestrationPhaseId
+  details?: Record<string, unknown>
+  timestamp: number
 }

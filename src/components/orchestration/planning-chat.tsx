@@ -61,9 +61,9 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
   }
 
   const examplePrompts = [
-    'HackByte 4.0, 24-hour hackathon, 200 participants, IIITDM Jabalpur, April 20. 5 volunteers.',
-    'College annual fest, 3-day event, 500 expected attendees, need venue, sponsors, and volunteer coordination.',
-    'Tech workshop series, 4 workshops over 2 weeks, 50 participants each, online registration.',
+    'HackByte 4.0, a 24-hour hackathon at IIITDM Jabalpur on April 20, expecting 200 participants.',
+    'Annual college cultural fest over 3 days with expected 500 attendees.',
+    'Tech workshop on AI/ML, single day event for 50 students at the main auditorium.',
   ]
 
   return (
@@ -78,8 +78,9 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
                 <span className="text-sm font-medium">Describe your event</span>
               </div>
               <p className="text-sm text-slate-300">
-                Tell me about the event you&apos;re organizing. Include details like the name, date,
-                venue, expected participants, and what needs to be coordinated.
+                Tell me about the event you&apos;re organizing. Include the name, date, venue, and
+                expected participants. I&apos;ll ask a few follow-up questions about your team, sponsors,
+                and requirements before creating your task plan.
               </p>
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-wide text-slate-400">Example prompts:</p>
@@ -137,7 +138,7 @@ export function PlanningChat({ onConfigGenerated }: PlanningChatProps) {
                   className="flex items-center gap-2 text-purple-300"
                 >
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Generating event structure...</span>
+                  <span className="text-sm">Elixa is thinking...</span>
                 </motion.div>
               )}
               <div ref={messagesEndRef} />

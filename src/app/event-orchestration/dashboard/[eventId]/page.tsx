@@ -23,7 +23,11 @@ import { TaskCard } from '@/components/orchestration/task-card'
 import { ProgressRing } from '@/components/orchestration/progress-ring'
 import { OperatorCodesDisplay } from '@/components/orchestration/operator-codes-display'
 import { TaskManagement } from '@/components/orchestration/task-management'
-import type { OrchestrationEvent, OrchestrationTask, OrchestrationSession, OrchestrationPhaseId } from '@/types'
+import { AnnouncementsPanel } from '@/components/orchestration/announcements-panel'
+import { ActivityFeed } from '@/components/orchestration/activity-feed'
+import { AnnouncementBar } from '@/components/orchestration/announcement-bar'
+import { announceCheckpointPassed } from '@/lib/speak'
+import type { OrchestrationEvent, OrchestrationTask, OrchestrationSession, OrchestrationPhaseId, OrchestrationAnnouncement } from '@/types'
 
 export default function DashboardPage() {
   const params = useParams()
@@ -32,6 +36,7 @@ export default function DashboardPage() {
 
   const [event, setEvent] = useState<OrchestrationEvent | null>(null)
   const [session, setSession] = useState<OrchestrationSession | null>(null)
+  const [announcements, setAnnouncements] = useState<OrchestrationAnnouncement[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [selectedTask, setSelectedTask] = useState<OrchestrationTask | null>(null)
@@ -52,11 +57,11 @@ export default function DashboardPage() {
     }
   }, [eventId])
 
-  // Fetch event data
+  // Fetch event data with announcements
   const fetchEvent = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/orchestration/action?event_id=${eventId}${session ? `&operator_id=${session.operator_id}` : ''}`
+        `/api/orchestration/action?event_id=${eventId}${session ? `&operator_id=${session.operator_id}` : ''}&include=announcements`
       )
       const data = await response.json()
 
@@ -64,7 +69,12 @@ export default function DashboardPage() {
         throw new Error(data.error || 'Failed to fetch event')
       }
 
-      setEvent(data.data)
+      setEvent(data.data.event || data.data) // Support both new and old response format
+      if (data.data.announcements) {
+        setAnnouncements(data.data.announcements)
+      } else if (data.data.event?.announcements) {
+        setAnnouncements(data.data.event.announcements)
+      }
     } catch (error) {
       console.error('Fetch error:', error)
       toast.error('Failed to load event data')
@@ -252,9 +262,9 @@ export default function DashboardPage() {
 
       toast.success(`${phase} checkpoint passed!`)
 
-      // Voice announcement for go/no-go
-      if (phase === 'gonogo' && event) {
-        speak(`All systems confirmed. ${event.name} is ready to launch.`)
+      // Voice announcement for checkpoint
+      if (event) {
+        announceCheckpointPassed(phase, event.name)
       }
 
       // Refresh event data
@@ -262,15 +272,6 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Checkpoint error:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to pass checkpoint')
-    }
-  }
-
-  // Simple TTS function
-  const speak = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.9
-      window.speechSynthesis.speak(utterance)
     }
   }
 
@@ -330,6 +331,9 @@ export default function DashboardPage() {
       }}
     >
       <div className="mx-auto max-w-7xl px-6 pb-20 pt-10 sm:px-10">
+        {/* Announcement Bar */}
+        <AnnouncementBar announcements={announcements} />
+
         {/* Header */}
         <header className="mb-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
@@ -459,6 +463,20 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Activity Feed */}
+            <ActivityFeed eventId={eventId} operatorId={session?.operator_id} />
+
+            {/* Announcements Panel (Director Only) */}
+            {session?.role === 'director' && (
+              <AnnouncementsPanel
+                eventId={eventId}
+                operatorId={session.operator_id}
+                announcements={announcements}
+                isDirector={true}
+                onAnnouncementSent={fetchEvent}
+              />
+            )}
 
             {/* Quick Stats */}
             <Card className="border-white/15 bg-[#1a1528]/60 backdrop-blur-md">
